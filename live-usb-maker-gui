@@ -4,21 +4,27 @@
 ##License is GPL 3.0
 ##originally developed for antiX and mx linux.
 
-##depends on live-usb-maker and yad
+##depends on live-usb-maker, cli-shell-utils and yad
+
+#add BitJam's soure cli-shell-utils
+source /usr/local/lib/cli-shell-utils/cli-shell-utils.bash
 
 ##translations
-
 TEXTDOMAINDIR=/usr/share/locale 
-TEXTDOMAIN=live-usb-maker-gui
+export TEXTDOMAIN="cli-shell-utils"
 
 TITLE=$"Live-USB Maker GUI"
-CHOOSE_USB=$"Choose USB Device"
-CHOOSE_ISO=$"Choose ISO"
+CHOOSE_MODE_TITLE=$"Live System Detected.  Select Live-USB creation mode"
+CHOOSE_MODE=$"Select Mode"
+CHOOSE_USB=$"Select USB Device"
+CHOOSE_CLONE=$"Clone Mode"
+CHOOSE_ISO=$"Select ISO"
+CLONE_RUNNING_SYSTEM=$"Clone Running Live System"
 INFO=$"Information"
 BAD_SOURCE=$"Source is not an ISO file.  Please choose another file."
 DESCRIPTION=$"Simple GUI for Live-USB Maker"
 VERSION=$"Version"
-USB_CHECK=$"No USB device detected.  Please insert a device and try again"
+USB_CHECK=$"No target USB device detected.  Please insert a device and try again"
 LICENSE=$"License"
 APPLY=$"Apply"
 CLOSE=$"Close"
@@ -26,53 +32,82 @@ ABOUT=$"About"
 HELP=$"Help"
 ADVANCE=$"Advanced"
 
+
 ##-----------------------------------------------------
+
+main()
+{
+MODE=2
+status=0
+##start gui and run actions
+##user that launched the app
+launch_user=$(ps -aux |grep -m 1 su-to-root |awk '{print $1}')
+echo "launch user is " $launch_user
+
+#offer clone mode if running live
+check_clone_mode
+
+while [ "$status" = "0" ]; do
+		display_selections
+		actions
+		status=$actionstatus
+	
+done
+}
 
 #define functions
 
+check_clone_mode()
+{
+LIVE_CHECK=$(df -T / |tail -n1 |awk '{print $2}')
+echo "live check = " $LIVE_CHECK
+if [ "$LIVE_CHECK" = "overlay" ] || [ "$LIVE_CHECK" = "aufs" ]; then
+
+	MODE_SELECTION=$(yad --window-icon=drive-removable-media-usb --form --num-output --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --title="$TITLE" \
+		--field="<b>$CHOOSE_MODE_TITLE</b>":LBL ""\
+		--field="":CB "$CLONE_RUNNING_SYSTEM!$CHOOSE_ISO"\
+		--field="":LBL "")
+
+	case $? in
+
+		0) 	MODE=$(echo $MODE_SELECTION|cut -d "|" -f2)
+	   		echo "Mode is " $MODE
+		   	;;
+		1) 	exit 0	
+	
+	esac
+fi
+
+}
+
+
 display_selections()
 {
-# populate variables
 
-unset usb_list
-#build list for usb_device selection box
-for i in $( find  /dev/ -name sd? |cut -d '/' -f3); do
-	test=$(udevadm info --query=property --path=/sys/block/$i | grep ID_BUS=usb)
-	if [ "$test" = "ID_BUS=usb" ]; then
-		vendor=$(udevadm info --query=property --path=/sys/block/$i |grep ID_VENDOR= |cut -d '=' -f2)
-		model=$(udevadm info --query=property --path=/sys/block/$i |grep ID_MODEL= |cut -d '=' -f2)
-		echo $i $vendor $model
-		if [ "$i" != "" ]; then
-		usb_list="$i $vendor $model!"$usb_list
-		fi
-	fi
-done
-
-if [ "$usb_device" != "" ]; then
-usb_list=$usb_device!$usb_list
-fi
-
-if [ "$usb_list" = "" ]; then
-yad --form --title=$INFO --button=gtk-ok --text="$USB_CHECK" --buttons-layout=center
-exit 0
-fi
-
-
-echo "usb_list is " $usb_list
-echo ""
+build_usb_list
 
 # get user selections with above for defaults
 
 #display selection dialog
 
-selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ADVANCE!drive-removable-media-usb!:6 --button=$ABOUT!help-about!:3 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
-	--field="<b>$TITLE</b>":LBL ""\
-	--field="$CHOOSE_USB":CB "$usb_list"\
-	--field="$CHOOSE_ISO":FL "none" \
-	--field="":LBL "")
+case $MODE in
 
-# parse user selections into something xfconf can deal with
+	1) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:3 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+		--field="<b>Clone Mode</b>":LBL ""\
+		--field="$CHOOSE_USB":CB "$usb_list"\
+		--field="$CHOOSE_CLONE":CB "clone"\
+		--field="":LBL "")
+		;;
+	
+
+	2) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:3 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+		--field="<b>$TITLE</b>":LBL ""\
+		--field="$CHOOSE_USB":CB "$usb_list"\
+		--field="$CHOOSE_ISO":FL "none" \
+		--field="":LBL "")
+esac
 }
+
 
 actions()
 {
@@ -89,19 +124,9 @@ case $status2 in
 	4) display_help
 	           ;;
 	5) display_license
-		   ;;
-	6) advanced_mode
+		 
 esac
 }
-
-advanced_mode()
-{
-
-x-terminal-emulator -e "live-usb-maker"
-actionstatus=1
-
-}
-
 
 adjust_settings()
 {
@@ -116,22 +141,37 @@ echo "source is " $source
 
 #check to make sure source is a iso
 
-if [ $(file "$source" |grep -i -q iso && echo $?) = 0 ]; then
-	echo "is a iso file"
-	echo "live-usb-maker simple -F umount -f "$source" -t /dev/$usb_device "
-	x-terminal-emulator -e "live-usb-maker simple -F umount -f '$source' -t /dev/$usb_device"
+if [ $MODE = 2 ]; then
+	if [ "$(file "$source" |grep -i -q iso && echo $?)" = "0" ]; then
+		echo "is a iso file"
+		is_a_iso=true
 	else
-	echo "not a iso file"
-	yad --form --title=$INFO --button=gtk-ok --text="$BAD_SOURCE" --buttons-layout=center
+		echo "not an iso file"
+		is_a_iso=false
+		yad --form --title=$INFO --button=gtk-ok --text="$BAD_SOURCE" --buttons-layout=center
+	fi
 fi
 
-actionstatus=0
+case $MODE in
+
+	1) x-terminal-emulator -e "live-usb-maker simple --force=umount --from=clone -t /dev/$usb_device" 2>/dev/null
+		actionstatus=0
+		;;
+			
+	2) if [ $is_a_iso = true ]; then
+		x-terminal-emulator -e "live-usb-maker simple --force=umount --from='$source' -t /dev/$usb_device" 2>/dev/null
+		actionstatus=0
+	   else
+		actionstatus=0
+	   fi
+		
+esac
+
 }
 
 
 display_about()
 {
-
 
 info=$(yad --selectable-labels --window-icon=drive-removable-media-usb --align=center --form --button=$LICENSE:5 --button=OK:0 --width=300 --title="About Live-USB Maker GUI"\
 	--field="<b>$TITLE</b>":LBL ""\
@@ -172,20 +212,40 @@ echo quit
 actionstatus=1
 }
 
-main()
+build_usb_list()
 {
-
-##start gui and run actions
-##user that launched the app
-launch_user=$(ps -aux |grep -v grep|grep -m 1 su-to-root|awk '{print $1}')
-echo "launch user is " $launch_user
-
-status=0
-while [ $status = "0" ]; do
-	display_selections
-	actions
-	status=$actionstatus
+#Check if running live
+Live_device=$(get_live_dev)
+echo $Live_device
+unset usb_list
+#build list for usb_device selection box
+for i in $( find  /dev/ -name sd? |cut -d '/' -f3); do
+	test=$(udevadm info --query=property --path=/sys/block/$i | grep ID_BUS=usb)
+	if [ "$i" != "$Live_device" ]; then
+		if [ "$test" = "ID_BUS=usb" ]; then
+			vendor=$(udevadm info --query=property --path=/sys/block/$i |grep ID_VENDOR= |cut -d '=' -f2)
+			model=$(udevadm info --query=property --path=/sys/block/$i |grep ID_MODEL= |cut -d '=' -f2)
+			echo $i $vendor $model
+			if [ "$i" != "" ]; then
+				usb_list="$i $vendor $model!"$usb_list
+			fi
+		fi
+	fi
 done
+
+if [ "$usb_device" != "" ]; then
+	usb_list=$usb_device!$usb_list
+fi
+
+if [ "$usb_list" = "" ]; then
+	yad --form --title=$INFO --button=gtk-ok --text="$USB_CHECK" --buttons-layout=center
+	exit 0
+fi
+
+
+echo "usb_list is " $usb_list
+echo ""
+
 }
 
 #launch gui
