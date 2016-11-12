@@ -41,255 +41,225 @@ COMPLETE=$"Completed Succesfully!"
 PRETEND=$1
 echo "Pretend Mode = " $PRETEND
 if [ "$PRETEND" = "-p" ]; then
-	echo "Pretend Mode Enabled"
+    echo "Pretend Mode Enabled"
 fi 
 
 
 ##-----------------------------------------------------
 
-main()
-{
-#create lock
-
-echo "creating lock ..."
+main() {
+   echo "creating lock ..."
     trap unflock EXIT
     gui_flock $LOCK_FILE || error "already locked"
     rm -f $ERR_FILE
 
-MODE=2
-status=0
-##start gui and run actions
-##user that launched the app
-launch_user=$(ps -aux |grep -m 1 su-to-root |awk '{print $1}')
-echo "launch user is " $launch_user
+    MODE=2
+    status=0
+    ##start gui and run actions
+    ##user that launched the app
+    launch_user=$(ps -aux |grep -m 1 su-to-root |awk '{print $1}')
+    echo "launch user is " $launch_user
 
-#offer clone mode if running live
-check_clone_mode
+    #offer clone mode if running live
+    check_clone_mode
 
-while [ "$status" = "0" ]; do
-		display_selections
-		actions
-		status=$actionstatus
-	
-done
-
-unflock $LOCK_FILE
+    while [ "$status" = "0" ]; do
+        display_selections
+        actions
+        status=$actionstatus
+    
+    done
+    unflock $LOCK_FILE
 }
 
 #define functions
 
-check_clone_mode()
-{
-LIVE_CHECK=$(df -T / |tail -n1 |awk '{print $2}')
-echo "live check = " $LIVE_CHECK
-if [ "$LIVE_CHECK" = "overlay" ] || [ "$LIVE_CHECK" = "aufs" ]; then
+check_clone_mode() {
+    LIVE_CHECK=$(df -T / |tail -n1 |awk '{print $2}')
+    echo "live check = " $LIVE_CHECK
+    if [ "$LIVE_CHECK" = "overlay" ] || [ "$LIVE_CHECK" = "aufs" ]; then
 
-	MODE_SELECTION=$(yad --window-icon=drive-removable-media-usb --form --num-output --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --title="$TITLE" \
-		--field="<b>$CHOOSE_MODE_TITLE</b>":LBL ""\
-		--field="":CB "$CLONE_RUNNING_SYSTEM!$CHOOSE_ISO"\
-		--field="":LBL "")
+        MODE_SELECTION=$(yad --window-icon=drive-removable-media-usb --form --num-output --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --title="$TITLE" \
+            --field="<b>$CHOOSE_MODE_TITLE</b>":LBL ""\
+            --field="":CB "$CLONE_RUNNING_SYSTEM!$CHOOSE_ISO"\
+            --field="":LBL "")
 
-	case $? in
+        case $? in
+            0)     MODE=$(echo $MODE_SELECTION|cut -d "|" -f2)
+                   echo "Mode is " $MODE ;;
 
-		0) 	MODE=$(echo $MODE_SELECTION|cut -d "|" -f2)
-	   		echo "Mode is " $MODE
-		   	;;
-		1) 	exit 0	
-	
-	esac
-fi
+            1)     exit 0    ;;
 
+	  252)     exit 0    ;;
+        esac
+    fi
 }
 
 
-display_selections()
-{
+display_selections() {
 
-build_usb_list
+    build_usb_list
 
-# get user selections with above for defaults
+    # get user selections with above for defaults
+    #display selection dialog
 
-#display selection dialog
+    case $MODE in
 
-case $MODE in
+        1) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:3 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+            --field="<b>Clone Mode</b>":LBL ""\
+            --field="$CHOOSE_USB":CB "$usb_list"\
+            --field="$CHOOSE_CLONE":CB "clone"\
+            --field="":LBL "") ;;
 
-	1) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:3 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
-		--field="<b>Clone Mode</b>":LBL ""\
-		--field="$CHOOSE_USB":CB "$usb_list"\
-		--field="$CHOOSE_CLONE":CB "clone"\
-		--field="":LBL "")
-		;;
-	
-
-	2) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:3 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
-		--field="<b>$TITLE</b>":LBL ""\
-		--field="$CHOOSE_USB":CB "$usb_list"\
-		--field="$CHOOSE_ISO":FL "none" \
-		--field="":LBL "")
-esac
+        2) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:3 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+            --field="<b>$TITLE</b>":LBL ""\
+            --field="$CHOOSE_USB":CB "$usb_list"\
+            --field="$CHOOSE_ISO":FL "none" \
+            --field="":LBL "") ;;
+    esac
 }
 
 
-actions()
-{
-status2=$?
+actions() {
+    status2=$?
 
-case $status2 in
+    case $status2 in
 
-	0) adjust_settings
-		   ;;
-	1) quit
-		   ;;
-	3) display_about
-	           ;;
-	4) display_help
-	           ;;
-	5) display_license
-		 
-esac
+        0) adjust_settings ;;
+        1) quit            ;;
+        3) display_about   ;;
+        4) display_help    ;;
+        5) display_license ;;
+	252)     quit    ;;
+    esac
 }
 
-adjust_settings()
-{
+adjust_settings() {
 
-echo $selections
+    echo $selections
 
-usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
-source=$(echo $selections|cut -d "|" -f3)
-source=$(readlink -f "$source")
+    usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
+    source=$(echo $selections|cut -d "|" -f3)
+    source=$(readlink -f "$source")
 
-echo "usb_device is " $usb_device
-echo "source is " $source
+    echo "usb_device is " $usb_device
+    echo "source is " $source
 
-#check to make sure source is a iso
+    #check to make sure source is a iso
 
-if [ $MODE = 2 ]; then
-	if [ "$(file "$source" |grep -i -q iso && echo $?)" = "0" ]; then
-		echo "is a iso file"
-		is_a_iso=true
-	else
-		echo "not an iso file"
-		is_a_iso=false
-		yad --form --title=$INFO --button=gtk-ok --text="$BAD_SOURCE" --buttons-layout=center
-	fi
-fi
+    if [ $MODE = 2 ]; then
+        if [ "$(file "$source" |grep -i -q iso && echo $?)" = "0" ]; then
+            echo "is a iso file"
+            is_a_iso=true
+        else
+            echo "not an iso file"
+            is_a_iso=false
+            yad --form --title=$INFO --button=gtk-ok --text="$BAD_SOURCE" --buttons-layout=center
+        fi
+    fi
 
-case $MODE in
+    case $MODE in
 
-	1) live-usb-maker gui $PRETEND --force=flock --from=clone -t /dev/$usb_device 2>/dev/null
-		if test -f $ERR_FILE; then 
-        		echo "cli code had a fatal error"
-        		MESSAGE="$(cat $ERR_FILE)"
-			yad --form --title="$INFO" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
-    		else
-        		echo "cli code ran without error"
-			yad --form --title="$INFO" --button=gtk-ok --text="$COMPLETE" --buttons-layout=center
-			
-    		fi
-		actionstatus=0
-		;;
-			
-	2) if [ $is_a_iso = true ]; then
-		live-usb-maker gui $PRETEND --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null
-    		if test -f $ERR_FILE; then 
-        		echo "cli code had a fatal error"
-        		MESSAGE="$(cat $ERR_FILE)"
-			yad --form --title="$INFO" --width=300 --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
-    		else
-        		echo "cli code ran without error"
-			yad --form --title="$INFO" --width=300 --button=gtk-ok --text="$COMPLETE" --buttons-layout=center
-			
-    		fi
-		actionstatus=0
-	   else
-		actionstatus=0
-	   fi
-		
-esac
-
+        1) live-usb-maker gui $PRETEND --force=flock --from=clone -t /dev/$usb_device 2>/dev/null
+            if test -f $ERR_FILE; then 
+                echo "cli code had a fatal error"
+                MESSAGE="$(cat $ERR_FILE)"
+                yad --form --title="$INFO" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
+            else
+                echo "cli code ran without error"
+                yad --form --title="$INFO" --button=gtk-ok --text="$COMPLETE" --buttons-layout=center
+            fi
+        actionstatus=0
+        ;;
+            
+        2)  if [ $is_a_iso = true ]; then
+                live-usb-maker gui $PRETEND --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null
+                if test -f $ERR_FILE; then 
+                    echo "cli code had a fatal error"
+                    MESSAGE="$(cat $ERR_FILE)"
+                    yad --form --title="$INFO" --width=300 --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
+                else
+                    echo "cli code ran without error"
+                    yad --form --title="$INFO" --width=300 --button=gtk-ok --text="$COMPLETE" --buttons-layout=center
+                fi
+                actionstatus=0
+            else
+                actionstatus=0
+            fi ;;
+    esac
 }
 
 
-display_about()
-{
+display_about() {
 
-info=$(yad --selectable-labels --window-icon=drive-removable-media-usb --align=center --form --button=$LICENSE:5 --button=OK:0 --width=300 --title="About Live-USB Maker GUI"\
-	--field="<b>$TITLE</b>":LBL ""\
-	--field=" ":LBL " "\
-	--field="$VERSION 16.11":LBL ""\
-	--field=" ":LBL " "\
-	--field="<b>$DESCRIPTION</b>":LBL ""\
-	--field=" ":LBL " "\
-	--field="http://mepis.antix.org":BTN "su $launch_user -c 'xdg-open http://antix.mepis.org'"\
-	--field="http://mxlinux.org":BTN "su $launch_user -c 'xdg-open https://mxlinux.org'"\
-	--field=" ":LBL " "\
-	--field="copyright (c) antiX":LBL "")
+    info=$(yad --selectable-labels --window-icon=drive-removable-media-usb --align=center --form --button=$LICENSE:5 --button=OK:0 --width=300 --title="About Live-USB Maker GUI"\
+        --field="<b>$TITLE</b>":LBL ""\
+        --field=" ":LBL " "\
+        --field="$VERSION 16.11":LBL ""\
+        --field=" ":LBL " "\
+        --field="<b>$DESCRIPTION</b>":LBL ""\
+        --field=" ":LBL " "\
+        --field="http://mepis.antix.org":BTN "su $launch_user -c 'xdg-open http://antix.mepis.org'"\
+        --field="http://mxlinux.org":BTN "su $launch_user -c 'xdg-open https://mxlinux.org'"\
+        --field=" ":LBL " "\
+        --field="copyright (c) antiX":LBL "")
 
-case $? in
+    case $? in
 
-	0) actionstatus=0
-	;;
-	5) display_license
-	;;
-esac
-}	
-	
-display_help()
-{
-su $launch_user -c "xdg-open https://mxlinux.org/wiki/help-files/help-live-usb-maker &"
-actionstatus=0
+        0) actionstatus=0  ;;
+        5) display_license ;;
+    esac
+}    
+    
+display_help() {
+    su $launch_user -c "xdg-open https://mxlinux.org/wiki/help-files/help-live-usb-maker &"
+    actionstatus=0
 }
 
-display_license()
-{
-su $launch_user -c "xdg-open https://mxlinux.org/wiki/licenses/license-live-usb-maker &"
-display_about
+display_license() {
+    su $launch_user -c "xdg-open https://mxlinux.org/wiki/licenses/license-live-usb-maker &"
+    display_about
 }
 
-quit()
-{
-echo quit
-actionstatus=1
+quit() {
+    echo quit
+    actionstatus=1
 }
 
-build_usb_list()
-{
-#Check if running live
-Live_device=$(get_live_dev)
-echo $Live_device
-unset usb_list
-#build list for usb_device selection box
-for i in $( find  /dev/ -name sd? |cut -d '/' -f3); do
-	test=$(udevadm info --query=property --path=/sys/block/$i | grep ID_BUS=usb)
-	if [ "$i" != "$Live_device" ]; then
-		if [ "$test" = "ID_BUS=usb" ]; then
-			vendor=$(udevadm info --query=property --path=/sys/block/$i |grep ID_VENDOR= |cut -d '=' -f2)
-			model=$(udevadm info --query=property --path=/sys/block/$i |grep ID_MODEL= |cut -d '=' -f2)
-			echo $i $vendor $model
-			if [ "$i" != "" ]; then
-				usb_list="$i $vendor $model!"$usb_list
-			fi
-		fi
-	fi
-done
+build_usb_list() {
+    #Check if running live
+    Live_device=$(get_live_dev)
+    echo $Live_device
+    unset usb_list
+    #build list for usb_device selection box
+    for i in $( find  /dev/ -name sd? |cut -d '/' -f3); do
+        test=$(udevadm info --query=property --path=/sys/block/$i | grep ID_BUS=usb)
+        if [ "$i" != "$Live_device" ]; then
+            if [ "$test" = "ID_BUS=usb" ]; then
+                vendor=$(udevadm info --query=property --path=/sys/block/$i |grep ID_VENDOR= |cut -d '=' -f2)
+                model=$(udevadm info --query=property --path=/sys/block/$i |grep ID_MODEL= |cut -d '=' -f2)
+                echo $i $vendor $model
+                if [ "$i" != "" ]; then
+                    usb_list="$i $vendor $model!"$usb_list
+                fi
+            fi
+        fi
+    done
 
-if [ "$usb_device" != "" ]; then
-	usb_list=$usb_device!$usb_list
-fi
+    if [ "$usb_device" != "" ]; then
+        usb_list=$usb_device!$usb_list
+    fi
 
-if [ "$usb_list" = "" ]; then
-	yad --form --title=$INFO --button=gtk-ok --text="$USB_CHECK" --buttons-layout=center
-	exit 0
-fi
+    if [ "$usb_list" = "" ]; then
+        yad --form --title=$INFO --button=gtk-ok --text="$USB_CHECK" --buttons-layout=center
+        exit 0
+    fi
 
-
-echo "usb_list is " $usb_list
-echo ""
-
+    echo "usb_list is " $usb_list
+    echo ""
 }
 
-error() 
-{
+error() {
     echo "Error: $*" >&2
     exit 3
 }
