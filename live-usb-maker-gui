@@ -13,6 +13,11 @@ source /usr/local/lib/cli-shell-utils/cli-shell-utils.bash
 TEXTDOMAINDIR=/usr/share/locale 
 export TEXTDOMAIN="cli-shell-utils"
 
+CLI_NAME="live-usb-maker"
+
+LOCK_FILE="/run/lock/$CLI_NAME"
+ERR_FILE="/var/log/$CLI_NAME.error"
+
 TITLE=$"Live-USB Maker GUI"
 CHOOSE_MODE_TITLE=$"Live System Detected.  Select Live-USB creation mode"
 CHOOSE_MODE=$"Select Mode"
@@ -31,12 +36,26 @@ CLOSE=$"Close"
 ABOUT=$"About"
 HELP=$"Help"
 ADVANCE=$"Advanced"
+COMPLETE=$"Completed Succesfully!"
+
+PRETEND=$1
+echo "Pretend Mode = " $PRETEND
+if [ "$PRETEND" = "-p" ]; then
+	echo "Pretend Mode Enabled"
+fi 
 
 
 ##-----------------------------------------------------
 
 main()
 {
+#create lock
+
+echo "creating lock ..."
+    trap unflock EXIT
+    gui_flock $LOCK_FILE || error "already locked"
+    rm -f $ERR_FILE
+
 MODE=2
 status=0
 ##start gui and run actions
@@ -53,6 +72,8 @@ while [ "$status" = "0" ]; do
 		status=$actionstatus
 	
 done
+
+unflock $LOCK_FILE
 }
 
 #define functions
@@ -135,6 +156,7 @@ echo $selections
 
 usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
 source=$(echo $selections|cut -d "|" -f3)
+source=$(readlink -f "$source")
 
 echo "usb_device is " $usb_device
 echo "source is " $source
@@ -154,12 +176,30 @@ fi
 
 case $MODE in
 
-	1) x-terminal-emulator -e "live-usb-maker simple --force=umount --from=clone -t /dev/$usb_device" 2>/dev/null
+	1) live-usb-maker gui $PRETEND --force=flock --from=clone -t /dev/$usb_device 2>/dev/null
+		if test -f $ERR_FILE; then 
+        		echo "cli code had a fatal error"
+        		MESSAGE="$(cat $ERR_FILE)"
+			yad --form --title="$INFO" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
+    		else
+        		echo "cli code ran without error"
+			yad --form --title="$INFO" --button=gtk-ok --text="$COMPLETE" --buttons-layout=center
+			
+    		fi
 		actionstatus=0
 		;;
 			
 	2) if [ $is_a_iso = true ]; then
-		x-terminal-emulator -e "live-usb-maker simple --force=umount --from='$source' -t /dev/$usb_device" 2>/dev/null
+		live-usb-maker gui $PRETEND --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null
+    		if test -f $ERR_FILE; then 
+        		echo "cli code had a fatal error"
+        		MESSAGE="$(cat $ERR_FILE)"
+			yad --form --title="$INFO" --width=300 --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
+    		else
+        		echo "cli code ran without error"
+			yad --form --title="$INFO" --width=300 --button=gtk-ok --text="$COMPLETE" --buttons-layout=center
+			
+    		fi
 		actionstatus=0
 	   else
 		actionstatus=0
@@ -246,6 +286,12 @@ fi
 echo "usb_list is " $usb_list
 echo ""
 
+}
+
+error() 
+{
+    echo "Error: $*" >&2
+    exit 3
 }
 
 #launch gui
