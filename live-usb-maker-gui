@@ -1,6 +1,6 @@
 #!/bin/bash
 
-##Original Code by dolphin_oracle November 8 2016 (dolphinoracle@gmail.com)
+##Original Code by dolphin_oracle and BitJam November 15 2016 (dolphinoracle@gmail.com)
 ##License is GPL 3.0
 ##originally developed for antiX and mx linux.
 
@@ -9,14 +9,18 @@
 #add BitJam's soure cli-shell-utils
 source /usr/local/lib/cli-shell-utils/cli-shell-utils.bash
 
-##translations
+#translations/locale stuff
 TEXTDOMAINDIR=/usr/share/locale 
 export TEXTDOMAIN="cli-shell-utils"
 
-CLI_NAME="live-usb-maker"
+WORK_DIR=/run/$ME
+FIFO=$WORK_DIR/fifo
 
-LOCK_FILE="/run/lock/$CLI_NAME"
-ERR_FILE="/var/log/$CLI_NAME.error"
+CLI_PROG="live-usb-maker"
+
+LOCK_FILE="/run/lock/$CLI_PROG"
+ERR_FILE="/var/log/$CLI_PROG.error"
+PROG_FILE="/var/log/$CLI_PROG.progress"
 
 TITLE=$"Live-USB Maker GUI"
 CHOOSE_MODE_TITLE=$"Live System Detected.  Select Live-USB creation mode"
@@ -48,10 +52,14 @@ fi
 ##-----------------------------------------------------
 
 main() {
-   echo "creating lock ..."
-    trap unflock EXIT
+    echo "creating lock ..."
+    trap clean_up EXIT
     gui_flock $LOCK_FILE || error "already locked"
-    rm -f $ERR_FILE
+    mkdir -p $WORK_DIR
+
+    mkfifo $FIFO
+    exec 10<> $FIFO
+    truncate -s0 $PROG_FILE
 
     MODE=2
     status=0
@@ -69,7 +77,7 @@ main() {
         status=$actionstatus
     
     done
-    unflock $LOCK_FILE
+    clean_up
 }
 
 #define functions
@@ -160,29 +168,14 @@ adjust_settings() {
 
     case $MODE in
 
-        1) live-usb-maker gui $PRETEND --force=flock --from=clone -t /dev/$usb_device 2>/dev/null
-            if test -f $ERR_FILE; then 
-                echo "cli code had a fatal error"
-                MESSAGE="$(cat $ERR_FILE)"
-                yad --form --title="$INFO" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
-            else
-                echo "cli code ran without error"
-                yad --form --title="$INFO" --button=gtk-ok --text="$COMPLETE" --buttons-layout=center
-            fi
-        actionstatus=0
-        ;;
+        1) $source="clone"
+	   make_live_usb
+           error_notification
+            ;;
             
         2)  if [ $is_a_iso = true ]; then
-                live-usb-maker gui $PRETEND --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null
-                if test -f $ERR_FILE; then 
-                    echo "cli code had a fatal error"
-                    MESSAGE="$(cat $ERR_FILE)"
-                    yad --form --title="$INFO" --width=300 --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
-                else
-                    echo "cli code ran without error"
-                    yad --form --title="$INFO" --width=300 --button=gtk-ok --text="$COMPLETE" --buttons-layout=center
-                fi
-                actionstatus=0
+                make_live_usb
+                error_notification
             else
                 actionstatus=0
             fi ;;
@@ -264,6 +257,78 @@ error() {
     exit 3
 }
 
+clean_up() 
+{
+    test -e $FIFO     && rm -f $FIFO
+    test -d $WORK_DIR && rmdir $WORK_DIR
+    unflock $LOCK_FILE
+}
+
+error_notification()
+{
+if test -f $ERR_FILE; then 
+    echo "cli code had a fatal error"
+    MESSAGE="$(cat $ERR_FILE)"
+    yad --window-icon=drive-removable-media-usb --form --title="$INFO" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
+    actionstatus=0
+else
+    echo "cli code ran without error"
+    yad --window-icon=drive-removable-media-usb --form --title="$INFO" --button=gtk-ok --text="$COMPLETE" --buttons-layout=center
+    actionstatus=1
+fi
+}
+
+make_live_usb()
+{
+local lum_pid yad_pid tail_pid
+
+    while true; do
+
+        yad --window-icon=drive-removable-media-usb --text-info --button=$CLOSE!gtk-close!:1 --width=880 --height=350 --tail --center <&10 &
+        yad_pid=$!
+
+        tail -n20  -f --pid=$yad_pid $PROG_FILE >&10 &
+	tail_pid=$!
+
+        if [ -z "$lum_pid" ]; then 
+            $CLI_PROG gui $PRETEND --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null &
+            lum_pid=$!
+        fi
+
+        while true; do
+            sleep 0.1
+            test -d /proc/$yad_pid && test -d /proc/$lum_pid && continue
+            break
+        done
+
+        # Suspend lum
+        test -d /proc/$lum_pid && kill -STOP $lum_pid
+
+        sleep .1
+
+        test -d /proc/$yad_pid || echo "yad exited"
+        test -d /proc/$lum_pid || echo "lum exited"
+
+        if test -d /proc/$lum_pid; then
+           YES_no "Do you want to keep going?" || break
+           kill -CONT $lum_pid
+           continue
+        else
+           break
+        fi
+    done
+
+    #echo -n "Press <Enter> to continue ... "
+    #read x
+    echo "killing yad and lum as needed  ..."
+	
+    sleep 2
+
+    # I don't know why I no longer get the Terminate message
+    kill $tail_pid 2>/dev/null
+    kill $yad_pid 2>/dev/null
+    kill $lum_pid 2>/dev/null
+}
 #launch gui
 
 main "$@"
