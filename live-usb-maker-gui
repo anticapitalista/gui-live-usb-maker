@@ -171,7 +171,7 @@ adjust_settings() {
 
     case $MODE in
 
-        1) $source="clone"
+        1) source="clone"
 	   make_live_usb
            error_notification
             ;;
@@ -225,7 +225,8 @@ quit() {
 build_usb_list() {
     #Check if running live
     Live_device=$(get_live_dev)
-    echo $Live_device
+    Live_device=$(printf '%s\n' "${Live_device//[[:digit:]]/}")
+    echo  "Live Device is " $Live_device
     unset usb_list
     #build list for usb_device selection box
     for i in $( find  /dev/ -name sd? |cut -d '/' -f3); do
@@ -303,6 +304,7 @@ local lum_pid yad_pid tail_pid
         if [ -z "$lum_pid" ]; then 
             $CLI_PROG gui $PRETEND --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null &
             lum_pid=$!
+	    echo "LUM PID IS " $lum_pid
         fi
 
         while true; do
@@ -324,7 +326,7 @@ local lum_pid yad_pid tail_pid
 #	   YES_no "Do you want to keep going?" || break
            case $? in
 
-                0) continue ;;
+                0) echo "Keep Going" ;;
                 1) USER_STOP=true && break ;;
 
            esac
@@ -340,8 +342,6 @@ local lum_pid yad_pid tail_pid
     #read x
     echo "killing yad and lum as needed  ..."
 	
-    sleep 1
-
     # I don't know why I no longer get the Terminate message
     kill_pids $yad_pid $lum_pid
 }
