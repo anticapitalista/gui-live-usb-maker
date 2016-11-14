@@ -330,7 +330,7 @@ local lum_pid yad_pid tail_pid
                 1) USER_STOP=true && break ;;
 
            esac
-               
+           sleep .1    
            kill -CONT $lum_pid
            continue
         else
@@ -341,7 +341,6 @@ local lum_pid yad_pid tail_pid
     #echo -n "Press <Enter> to continue ... "
     #read x
     echo "killing yad and lum as needed  ..."
-	
     # I don't know why I no longer get the Terminate message
     kill_pids $yad_pid $lum_pid
 }
