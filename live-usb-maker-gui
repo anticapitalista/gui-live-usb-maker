@@ -62,8 +62,7 @@ fi
 main() {
     echo "creating lock ..."
     trap clean_up EXIT
-    check_flock
-    gui_flock $LOCK_FILE
+    gui_flock $LOCK_FILE || flock_error
     mkdir -p $WORK_DIR
 
     mkfifo $FIFO
@@ -356,25 +355,22 @@ kill_pids() {
     for pid; do
         test -z $pid && continue
         disown  $pid 2>/dev/null
-        pkill --parent $pid 
+        pkill --parent $pid
         kill    $pid 2>/dev/null
     done
 }
 
-check_flock()
+flock_error()
 {
-
-if [ -e $LOCK_FILE ]; then
-    local flck_pid
-    flck_pid=$(flock_pid)
-    echo $flck_pid
-    if [ ${#flck_pid} -gt 0 ]; then
-        msg=$(printf "$MSG_LUM_LOCK_EXISTS" live-usb-maker $flck_pid)
-    else
-        msg=$(printf "MSG_OTHER_LOCK_ERROR" $LOCK_FILE)
-    fi
-    yad_error "$msg"
+local flck_pid
+flck_pid=$(flock_pid)
+echo $flck_pid
+if [ ${#flck_pid} -gt 0 ]; then
+    msg=$(printf "$MSG_LUM_LOCK_EXISTS" live-usb-maker $flck_pid)
+else
+    msg=$(printf "$MSG_OTHER_LOCK_ERROR" $LOCK_FILE)
 fi
+yad_error "$msg"
 
 }
 
