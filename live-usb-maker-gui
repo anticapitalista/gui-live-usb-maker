@@ -44,6 +44,11 @@ HELP=$"Help"
 ADVANCE=$"Advanced"
 COMPLETE=$"LiveUSB creation succesful!"
 STOP_MESSAGE=$"Operation stopped by user."
+MSG_LUM_LOCK_EXISTS=$"A %s process is already running with PID %s \n Please close that process before starting a new one"
+MSG_OTHER_LOCK_ERROR=$"Failed to obtain lock on %s"
+PROGRESS_CLOSED=$"Progress window closed, but job not done. Do you want to keep going?"
+YES=$"Yes"
+NO=$"No"
 
 PRETEND=$1
 echo "Pretend Mode = " $PRETEND
@@ -57,7 +62,8 @@ fi
 main() {
     echo "creating lock ..."
     trap clean_up EXIT
-    gui_flock $LOCK_FILE || error "already locked"
+    check_flock
+    gui_flock $LOCK_FILE
     mkdir -p $WORK_DIR
 
     mkfifo $FIFO
@@ -165,7 +171,7 @@ adjust_settings() {
         else
             echo "not an iso file"
             is_a_iso=false
-            yad --form --title=$INFO --button=gtk-ok --text="$BAD_SOURCE" --buttons-layout=center
+            yad --form --title=$TITLE --button=gtk-ok --text="$BAD_SOURCE" --buttons-layout=center
         fi
     fi
 
@@ -248,7 +254,7 @@ build_usb_list() {
     fi
 
     if [ "$usb_list" = "" ]; then
-        yad --form --title=$INFO --button=gtk-ok --text="$USB_CHECK" --buttons-layout=center
+        yad --form --title="$TITLE" --button=gtk-ok --text="$USB_CHECK" --buttons-layout=center
         exit 0
     fi
 
@@ -272,7 +278,7 @@ error_notification()
 {
 
 if [ $USER_STOP = true ]; then
-    yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$INFO" --button=gtk-ok --buttons-layout=center --field="<b>$STOP_MESSAGE</b>":LBL ""
+    yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$STOP_MESSAGE</b>":LBL ""
     actionstatus=1
 fi
 
@@ -280,11 +286,11 @@ if [ $USER_STOP = false ]; then
     if test -f $ERR_FILE; then 
         echo "cli code had a fatal error"
         MESSAGE="$(cat $ERR_FILE)"
-        yad --window-icon=drive-removable-media-usb --width=300 --form --title="$INFO" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
+        yad --window-icon=drive-removable-media-usb --width=300 --form --title="$TITLE" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
         actionstatus=0
     else
         echo "cli code ran without error"
-        yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$INFO" --button=gtk-ok --buttons-layout=center --field="<b>$COMPLETE</b>":LBL ""
+        yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$COMPLETE</b>":LBL ""
         actionstatus=1
     fi
 fi
@@ -322,7 +328,7 @@ local lum_pid yad_pid tail_pid
         test -d /proc/$lum_pid || echo "lum exited"
 
         if test -d /proc/$lum_pid; then
-           yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$INFO" --button=$"No"!gtk-close!:1 --button=$"Yes"!gtk-ok!:0 --buttons-layout=center --field=$"Progress window closed, but job not done. Do you want to keep going?":LBL ""
+           yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button="$NO"!gtk-close!:1 --button="$YES"!gtk-ok!:0 --buttons-layout=center --field="$PROGRESS_CLOSED":LBL ""
 #	   YES_no "Do you want to keep going?" || break
            case $? in
 
@@ -337,7 +343,7 @@ local lum_pid yad_pid tail_pid
            break
         fi
     done
-
+    kill -CONT $lum_pid
     #echo -n "Press <Enter> to continue ... "
     #read x
     echo "killing yad and lum as needed  ..."
@@ -353,6 +359,31 @@ kill_pids() {
         pkill --parent $pid 
         kill    $pid 2>/dev/null
     done
+}
+
+check_flock()
+{
+
+if [ -e $LOCK_FILE ]; then
+    local flck_pid
+    flck_pid=$(flock_pid)
+    echo $flck_pid
+    if [ ${#flck_pid} -gt 0 ]; then
+        msg=$(printf "$MSG_LUM_LOCK_EXISTS" live-usb-maker $flck_pid)
+    else
+        msg=$(printf "MSG_OTHER_LOCK_ERROR" $LOCK_FILE)
+    fi
+    yad_error "$msg"
+fi
+
+}
+
+yad_error()
+{
+
+local error_message=$1
+yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$error_message</b>":LBL ""
+    exit 0
 }
 
 #launch gui
