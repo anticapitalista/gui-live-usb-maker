@@ -42,9 +42,10 @@ CLOSE=$"Close"
 ABOUT=$"About"
 HELP=$"Help"
 ADVANCE=$"Advanced"
-COMPLETE=$"LiveUSB creation succesful!"
+COMPLETE=$"LiveUSB creation successful!"
 STOP_MESSAGE=$"Operation stopped by user."
-MSG_LUM_LOCK_EXISTS=$"A %s process is already running with PID %s \n Please close that process before starting a new one"
+MSG_LUM_LOCK_EXISTS=$"A %s process (using PID %s) is already running"
+MSG_LUM_LOCK_EXISTS_2=$"Please close that process before starting a new one"
 MSG_OTHER_LOCK_ERROR=$"Failed to obtain lock on %s"
 PROGRESS_CLOSED=$"Progress window closed, but job not done. Do you want to keep going?"
 YES=$"Yes"
@@ -364,7 +365,7 @@ local flck_pid
 flck_pid=$(flock_pid)
 echo $flck_pid
 if [ ${#flck_pid} -gt 0 ]; then
-    msg=$(printf "$MSG_LUM_LOCK_EXISTS" live-usb-maker $flck_pid)
+    msg=$(printf "$MSG_LUM_LOCK_EXISTS \n $MSG_LUM_LOCK_EXISTS_2" live-usb-maker $flck_pid)
 else
     msg=$(printf "$MSG_OTHER_LOCK_ERROR" $LOCK_FILE)
 fi
