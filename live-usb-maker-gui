@@ -328,21 +328,19 @@ local lum_pid yad_pid tail_pid
 
         if test -d /proc/$lum_pid; then
            yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button="$NO"!gtk-close!:1 --button="$YES"!gtk-ok!:0 --buttons-layout=center --field="$PROGRESS_CLOSED":LBL ""
-#	   YES_no "Do you want to keep going?" || break
-           case $? in
+       	   local ret=$?
+           kill -CONT $lum_pid
+           case $ret in
 
                 0) echo "Keep Going" ;;
                 1) USER_STOP=true && break ;;
 
            esac
-           sleep .1    
-           kill -CONT $lum_pid
            continue
         else
            break
         fi
     done
-    kill -CONT $lum_pid
     #echo -n "Press <Enter> to continue ... "
     #read x
     echo "killing yad and lum as needed  ..."
