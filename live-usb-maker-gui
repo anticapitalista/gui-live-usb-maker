@@ -11,7 +11,7 @@ source /usr/local/lib/cli-shell-utils/cli-shell-utils.bash
 
 #translations/locale stuff
 TEXTDOMAINDIR=/usr/share/locale 
-export TEXTDOMAIN="cli-shell-utils"
+export TEXTDOMAIN="live-usb-maker-gui"
 
 WORK_DIR=/run/$ME
 FIFO=$WORK_DIR/fifo
