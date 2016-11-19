@@ -57,6 +57,13 @@ if [ "$PRETEND" = "-p" ]; then
     echo "Pretend Mode Enabled"
 fi 
 
+##If on mx-viewer is present, use mx-viewer, else wise use generic xdg-open 
+if [ -e "/usr/bin/mx-viewer" ]; then
+    BROWSER="mx-viewer"
+else
+    BROWSER="xdg-open"
+fi
+
 
 ##-----------------------------------------------------
 
@@ -201,8 +208,8 @@ display_about() {
         --field=" ":LBL " "\
         --field="<b>$DESCRIPTION</b>":LBL ""\
         --field=" ":LBL " "\
-        --field="http://mepis.antix.org":BTN "su $launch_user -c 'xdg-open http://antix.mepis.org'"\
-        --field="http://mxlinux.org":BTN "su $launch_user -c 'xdg-open https://mxlinux.org'"\
+        --field="http://mepis.antix.org":BTN "su $launch_user -c '$BROWSER http://antix.mepis.org'"\
+        --field="http://mxlinux.org":BTN "su $launch_user -c '$BROWSER https://mxlinux.org'"\
         --field=" ":LBL " "\
         --field="copyright (c) antiX":LBL "")
 
@@ -214,12 +221,12 @@ display_about() {
 }    
     
 display_help() {
-    su $launch_user -c "xdg-open https://mxlinux.org/wiki/help-files/help-live-usb-maker &"
+    su $launch_user -c "$BROWSER https://mxlinux.org/wiki/help-files/help-live-usb-maker &"
     actionstatus=0
 }
 
 display_license() {
-    su $launch_user -c "xdg-open https://mxlinux.org/wiki/licenses/license-live-usb-maker &"
+    su $launch_user -c "$BROWSER https://mxlinux.org/wiki/licenses/license-live-usb-maker &"
     display_about
 }
 
@@ -302,7 +309,7 @@ local lum_pid yad_pid tail_pid
 
     while true; do
 
-        yad --window-icon=drive-removable-media-usb --text-info --button=$CLOSE!gtk-close!:1 --width=880 --height=350 --tail --center <&10 &
+        yad --window-icon=drive-removable-media-usb --title="$TITLE" --text-info --button=$CLOSE!gtk-close!:1 --width=880 --height=350 --tail --center <&10 &
         yad_pid=$!
 
         tail -n20  -f --pid=$yad_pid $PROG_FILE >&10 &
