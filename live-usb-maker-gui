@@ -129,16 +129,16 @@ display_selections() {
 
     case $MODE in
 
-        1) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:3 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        1) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>Clone Mode</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_CLONE":CB "clone"\
             --field="":LBL "") ;;
 
-        2) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:3 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        2) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
-            --field="$CHOOSE_ISO":FL "none" \
+            --field="$CHOOSE_ISO":FL "$source" \
             --field="":LBL "") ;;
     esac
 }
@@ -151,7 +151,7 @@ actions() {
 
         0) adjust_settings ;;
         1) quit            ;;
-        3) display_about   ;;
+        8) display_about   ;;
         4) display_help    ;;
         5) display_license ;;
 	252)     quit    ;;
@@ -162,9 +162,7 @@ adjust_settings() {
 
     echo $selections
 
-    usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
-    source=$(echo $selections|cut -d "|" -f3)
-    source=$(readlink -f "$source")
+    device_and_source
 
     echo "usb_device is " $usb_device
     echo "source is " $source
@@ -200,7 +198,7 @@ adjust_settings() {
 
 
 display_about() {
-
+    device_and_source
     info=$(yad --selectable-labels --window-icon=drive-removable-media-usb --align=center --form --button=$LICENSE:5 --button=OK:0 --width=300 --title="About Live-USB Maker GUI"\
         --field="<b>$TITLE</b>":LBL ""\
         --field=" ":LBL " "\
@@ -221,6 +219,7 @@ display_about() {
 }    
     
 display_help() {
+    device_and_source
     su $launch_user -c "$BROWSER https://mxlinux.org/wiki/help-files/help-live-usb-maker &"
     actionstatus=0
 }
@@ -317,6 +316,7 @@ local lum_pid yad_pid tail_pid
         if [ -z "$lum_pid" ]; then 
             $CLI_PROG gui $PRETEND --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null &
             lum_pid=$!
+            fake_progress
 	    echo "LUM PID IS " $lum_pid
         fi
 
@@ -335,12 +335,13 @@ local lum_pid yad_pid tail_pid
         test -d /proc/$lum_pid || echo "lum exited"
 
         if test -d /proc/$lum_pid; then
+           kill_pids $yad_prog_pid
            yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button="$NO"!gtk-close!:1 --button="$YES"!gtk-ok!:0 --buttons-layout=center --field="$PROGRESS_CLOSED":LBL ""
        	   local ret=$?
            kill -CONT $lum_pid
            case $ret in
 
-                0) echo "Keep Going" ;;
+                0) fake_progress ;;
                 1) USER_STOP=true && break ;;
 
            esac
@@ -353,7 +354,7 @@ local lum_pid yad_pid tail_pid
     #read x
     echo "killing yad and lum as needed  ..."
     # I don't know why I no longer get the Terminate message
-    kill_pids $yad_pid $lum_pid
+    kill_pids $yad_pid $lum_pid $yad_prog_pid
 }
 
 kill_pids() {
@@ -388,6 +389,18 @@ yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --
     exit 0
 }
 
+device_and_source()
+{
+usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
+source=$(echo $selections|cut -d "|" -f3)
+source=$(readlink -f "$source")
+}
+
+fake_progress()
+{
+yad --window-icon=drive-removable-media-usb --undecorated --no-escape --title="$TITLE" --skip-taskbar --width=300 --progress --pulsate --on-top --no-buttons &
+yad_prog_pid=$!
+}
 #launch gui
 
 main "$@"
