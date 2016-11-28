@@ -241,7 +241,7 @@ build_usb_list() {
     echo  "Live Device is " $Live_device
     unset usb_list
     #build list for usb_device selection box
-    for i in $( find  /dev/ -name sd? |cut -d '/' -f3); do
+    for i in $( find  /dev/ -name "sd?" |cut -d '/' -f3); do
         test=$(udevadm info --query=property --path=/sys/block/$i | grep ID_BUS=usb)
         if [ "$i" != "$Live_device" ]; then
             if [ "$test" = "ID_BUS=usb" ]; then
