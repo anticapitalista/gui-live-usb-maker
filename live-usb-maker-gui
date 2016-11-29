@@ -246,9 +246,11 @@ build_usb_list() {
         unset VENDOR NAME SIZE MODEL
         echo "$line"
         eval "$line"
-        test=$(udevadm info --query=property --path=/sys/block/$NAME | grep ID_BUS=usb)
+        is_usb_or_removable $NAME
+        test=$?
+        echo "test is " "$test"
         if [ "$NAME" != "$Live_device" ]; then
-            if [ "$test" = "ID_BUS=usb" ]; then
+            if [ $test = 0 ]; then
                 echo $NAME $VENDOR $MODEL $SIZE
                 if [ "$line" != "" ]; then
                     usb_list="$NAME   $VENDOR $MODEL $SIZE!"$usb_list
