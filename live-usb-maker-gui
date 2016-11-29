@@ -236,24 +236,28 @@ quit() {
 
 build_usb_list() {
     #Check if running live
+    local line VENDOR NAME SIZE MODEL
     Live_device=$(get_live_dev)
     Live_device=$(printf '%s\n' "${Live_device//[[:digit:]]/}")
     echo  "Live Device is " $Live_device
     unset usb_list
     #build list for usb_device selection box
-    for i in $( find  /dev/ -name "sd?" |cut -d '/' -f3); do
-        test=$(udevadm info --query=property --path=/sys/block/$i | grep ID_BUS=usb)
-        if [ "$i" != "$Live_device" ]; then
+    while read line; do
+        unset VENDOR NAME SIZE MODEL
+        echo "$line"
+        eval "$line"
+        test=$(udevadm info --query=property --path=/sys/block/$NAME | grep ID_BUS=usb)
+        if [ "$NAME" != "$Live_device" ]; then
             if [ "$test" = "ID_BUS=usb" ]; then
-                vendor=$(udevadm info --query=property --path=/sys/block/$i |grep ID_VENDOR= |cut -d '=' -f2)
-                model=$(udevadm info --query=property --path=/sys/block/$i |grep ID_MODEL= |cut -d '=' -f2)
-                echo $i $vendor $model
-                if [ "$i" != "" ]; then
-                    usb_list="$i $vendor $model!"$usb_list
+                echo $NAME $VENDOR $MODEL $SIZE
+                if [ "$line" != "" ]; then
+                    usb_list="$NAME   $VENDOR $MODEL $SIZE!"$usb_list
                 fi
             fi
         fi
-    done
+    done<<LsBlk
+$(lsblk --nodeps --pairs -no name,size,model,vendor -I 3,8,22,179,259)
+LsBlk
 
     if [ "$usb_device" != "" ]; then
         usb_list=$usb_device!$usb_list
