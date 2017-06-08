@@ -50,6 +50,7 @@ MSG_OTHER_LOCK_ERROR=$"Failed to obtain lock on %s"
 PROGRESS_CLOSED=$"Progress window closed, but job not done. Do you want to keep going?"
 YES=$"Yes"
 NO=$"No"
+ENCRYPT=$"Encrypt Live-USB"
 
 PRETEND=$1
 echo "Pretend Mode = " $PRETEND
@@ -77,6 +78,12 @@ main() {
     exec 10<> $FIFO
     truncate -s0 $PROG_FILE
 
+
+    ##MODE 1 is clone, no encyrption available
+    ##MODE 2 is standard with no encryption available
+    ##MODE 3 is clone with encryption available
+    ##MODE 4 is standard iso selection with encryption available
+    ##We start with mode 2, standard no encyrption, for backward compatibility
     MODE=2
     status=0
     ##start gui and run actions
@@ -86,6 +93,12 @@ main() {
 
     #offer clone mode if running live
     check_clone_mode
+    
+    ##check that encrypt option is available
+    live-usb-maker --help | grep -q -- --encrypt 
+    if [ $? = 0 ]; then 
+        add_encrypt_checkbox
+    fi
 
     while [ "$status" = "0" ]; do
         display_selections
@@ -140,6 +153,20 @@ display_selections() {
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" \
             --field="":LBL "") ;;
+            
+        3) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+            --field="<b>Clone Mode</b>":LBL ""\
+            --field="$CHOOSE_USB":CB "$usb_list"\
+            --field="$CHOOSE_CLONE":CB "clone"\
+            --field="$ENCRYPT":CHK ""\
+            --field="":LBL "") ;;
+
+        4) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+            --field="<b>$TITLE</b>":LBL ""\
+            --field="$CHOOSE_USB":CB "$usb_list"\
+            --field="$CHOOSE_ISO":FL "$source" \
+            --field="$ENCRYPT":CHK ""\
+            --field="":LBL "") ;;
     esac
 }
 
@@ -166,10 +193,11 @@ adjust_settings() {
 
     echo "usb_device is " $usb_device
     echo "source is " $source
+    echo "make encrypt is " $make_encrypt
 
     #check to make sure source is a iso
 
-    if [ $MODE = 2 ]; then
+    if [[ $MODE = 2 || $MODE = 4 ]]; then
         if [ "$(file "$source" |grep -i -q iso && echo $?)" = "0" ]; then
             echo "is a iso file"
             is_a_iso=true
@@ -183,11 +211,23 @@ adjust_settings() {
     case $MODE in
 
         1) source="clone"
-	   make_live_usb
+           make_live_usb
+           error_notification
+            ;;
+            
+        3) source="clone"
+           make_live_usb
            error_notification
             ;;
             
         2)  if [ $is_a_iso = true ]; then
+                make_live_usb
+                error_notification
+            else
+                actionstatus=0
+            fi ;;
+            
+        4)  if [ $is_a_iso = true ]; then
                 make_live_usb
                 error_notification
             else
@@ -310,7 +350,15 @@ fi
 
 make_live_usb()
 {
-local lum_pid yad_pid tail_pid
+local lum_pid yad_pid tail_pid ENCRYPT_OPTION
+
+    if [ $make_encrypt ]; then
+        ENCRYPT_OPTION="--encrypt"
+        else
+        ENCRYPT_OPTION=""
+    fi
+    
+    echo "Encrypt enabled in lum is " $ENCRYPT_OPTION
 
     while true; do
 
@@ -320,7 +368,7 @@ local lum_pid yad_pid tail_pid
         tail -n20  -f --pid=$yad_pid $PROG_FILE >&10 &
 	
         if [ -z "$lum_pid" ]; then 
-            $CLI_PROG gui $PRETEND --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null &
+            $CLI_PROG gui $PRETEND $ENCRYPT_OPTION --msdos --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null &
             lum_pid=$!
             fake_progress
 	    echo "LUM PID IS " $lum_pid
@@ -397,15 +445,35 @@ yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --
 
 device_and_source()
 {
+echo $selections
 usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
 source=$(echo $selections|cut -d "|" -f3)
 source=$(readlink -f "$source")
+make_encrypt=$(echo $selections|cut -d "|" -f4)
 }
 
 fake_progress()
 {
 yad --window-icon=drive-removable-media-usb --undecorated --no-escape --title="$TITLE" --skip-taskbar --width=300 --progress --pulsate --on-top --no-buttons &
 yad_prog_pid=$!
+}
+
+add_encrypt_checkbox()
+{
+echo encypt test
+echo MODE = $MODE
+
+##MODE 1 is clone, no encyrption available
+##MODE 2 is standard with no encryption available
+##MODE 3 is clone with encryption available
+##MODE 4 is standard iso selection with encryption available
+
+case $MODE in
+
+    1) MODE=3;;
+    2) MODE=4;;
+
+esac
 }
 #launch gui
 
