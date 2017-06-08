@@ -95,7 +95,10 @@ main() {
     check_clone_mode
     
     ##check that encrypt option is available
-    live-usb-maker --help | grep -q -- --encrypt && add_encrypt_checkbox
+    live-usb-maker --help | grep -q -- --encrypt 
+    if [ $? = 0 ]; then 
+        add_encrypt_checkbox
+    fi
 
     while [ "$status" = "0" ]; do
         display_selections
@@ -349,7 +352,7 @@ make_live_usb()
 {
 local lum_pid yad_pid tail_pid ENCRYPT_OPTION
 
-    if [ make_encrypt ]; then
+    if [ $make_encrypt ]; then
         ENCRYPT_OPTION="--encrypt"
         else
         ENCRYPT_OPTION=""
@@ -365,7 +368,7 @@ local lum_pid yad_pid tail_pid ENCRYPT_OPTION
         tail -n20  -f --pid=$yad_pid $PROG_FILE >&10 &
 	
         if [ -z "$lum_pid" ]; then 
-            $CLI_PROG gui $PRETEND $ENCRYPT_OPTION --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null &
+            $CLI_PROG gui $PRETEND $ENCRYPT_OPTION --msdos --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null &
             lum_pid=$!
             fake_progress
 	    echo "LUM PID IS " $lum_pid
@@ -442,6 +445,7 @@ yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --
 
 device_and_source()
 {
+echo $selections
 usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
 source=$(echo $selections|cut -d "|" -f3)
 source=$(readlink -f "$source")
