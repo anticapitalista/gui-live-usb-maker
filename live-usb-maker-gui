@@ -100,6 +100,15 @@ main() {
         add_encrypt_checkbox
     fi
 
+    ##check that gui progress option is available
+    live-usb-maker --help | grep -q -- --gui-progress
+    if [ $? = 0 ]; then
+        PROGRESS_OPTION="--gui-progress yad --center --window-icon=drive-removable-media-usb --no-escape --title=\"$TITLE\" --width=300 --progress --no-buttons --auto-close --undecorated "
+    else
+        PROGRESS_OPTION=""
+    fi
+    echo Progress Option is $PROGRESS_OPTION 
+
     while [ "$status" = "0" ]; do
         display_selections
         actions
@@ -142,26 +151,26 @@ display_selections() {
 
     case $MODE in
 
-        1) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        1) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>Clone Mode</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_CLONE":CB "clone"\
             --field="":LBL "") ;;
 
-        2) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        2) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" \
             --field="":LBL "") ;;
             
-        3) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        3) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>Clone Mode</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_CLONE":CB "clone"\
             --field="$ENCRYPT":CHK ""\
             --field="":LBL "") ;;
 
-        4) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        4) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" \
@@ -330,7 +339,7 @@ error_notification()
 {
 
 if [ $USER_STOP = true ]; then
-    yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$STOP_MESSAGE</b>":LBL ""
+    yad --window-icon=drive-removable-media-usb --center --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$STOP_MESSAGE</b>":LBL ""
     actionstatus=1
 fi
 
@@ -338,11 +347,11 @@ if [ $USER_STOP = false ]; then
     if test -f $ERR_FILE; then 
         echo "cli code had a fatal error"
         MESSAGE="$(cat $ERR_FILE)"
-        yad --window-icon=drive-removable-media-usb --width=300 --form --title="$TITLE" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
+        yad --window-icon=drive-removable-media-usb --center --width=300 --form --title="$TITLE" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
         actionstatus=0
     else
         echo "cli code ran without error"
-        yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$COMPLETE</b>":LBL ""
+        yad --window-icon=drive-removable-media-usb --center --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$COMPLETE</b>":LBL ""
         actionstatus=1
     fi
 fi
@@ -352,7 +361,7 @@ make_live_usb()
 {
 local lum_pid yad_pid tail_pid ENCRYPT_OPTION
 
-    if [ $make_encrypt ]; then
+    if [ "$make_encrypt" = "TRUE" ]; then
         ENCRYPT_OPTION="--encrypt"
         else
         ENCRYPT_OPTION=""
@@ -362,15 +371,17 @@ local lum_pid yad_pid tail_pid ENCRYPT_OPTION
 
     while true; do
 
-        yad --window-icon=drive-removable-media-usb --title="$TITLE" --text-info --button=$CLOSE!gtk-close!:1 --width=880 --height=350 --tail --center <&10 &
+        yad --window-icon=drive-removable-media-usb --center --title="$TITLE" --text-info --button=$CLOSE!gtk-close!:1 --width=880 --height=350 --tail --center <&10 &
         yad_pid=$!
 
         tail -n20  -f --pid=$yad_pid $PROG_FILE >&10 &
 	
         if [ -z "$lum_pid" ]; then 
-            $CLI_PROG gui $PRETEND $ENCRYPT_OPTION --msdos --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null &
+            $CLI_PROG gui $PRETEND $ENCRYPT_OPTION --msdos --force=flock --from="$source" -t /dev/$usb_device $PROGRESS_OPTION 2>/dev/null &
             lum_pid=$!
+            if [ "$PROGRESS_OPTION" = "" ]; then
             fake_progress
+            fi
 	    echo "LUM PID IS " $lum_pid
         fi
 
@@ -390,12 +401,18 @@ local lum_pid yad_pid tail_pid ENCRYPT_OPTION
 
         if test -d /proc/$lum_pid; then
            kill_pids $yad_prog_pid
-           yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button="$NO"!gtk-close!:1 --button="$YES"!gtk-ok!:0 --buttons-layout=center --field="$PROGRESS_CLOSED":LBL ""
+           yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --center --title="$TITLE" --button="$NO"!gtk-close!:1 --button="$YES"!gtk-ok!:0 --buttons-layout=center --field="$PROGRESS_CLOSED":LBL ""
        	   local ret=$?
            kill -CONT $lum_pid
            case $ret in
 
-                0) fake_progress ;;
+                0) if [ "$PROGRESS_OPTION" = "" ]; then
+                   fake_progress
+                   else
+                   echo continueing
+                   fi
+                   ;;
+
                 1) USER_STOP=true && break ;;
 
            esac
@@ -439,7 +456,7 @@ yad_error()
 {
 
 local error_message=$1
-yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$error_message</b>":LBL ""
+yad --window-icon=drive-removable-media-usb --width=300 --align=center --center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$error_message</b>":LBL ""
     exit 0
 }
 
@@ -454,9 +471,10 @@ make_encrypt=$(echo $selections|cut -d "|" -f4)
 
 fake_progress()
 {
-yad --window-icon=drive-removable-media-usb --undecorated --no-escape --title="$TITLE" --skip-taskbar --width=300 --progress --pulsate --on-top --no-buttons &
+tail -n20  -f --pid=$yad_pid $PROG_FILE  |yad --window-icon=drive-removable-media-usb --center --undecorated --no-escape --title="$TITLE" --skip-taskbar --width=300 --progress --progress-text="$TITLE" --pulsate --on-top --no-buttons &
 yad_prog_pid=$!
 }
+
 
 add_encrypt_checkbox()
 {
