@@ -100,6 +100,15 @@ main() {
         add_encrypt_checkbox
     fi
 
+    ##check that gui progress option is available
+    live-usb-maker --help | grep -q -- --gui-progress
+    if [ $? = 0 ]; then
+        PROGRESS_OPTION="--gui-progress yad --center --window-icon=drive-removable-media-usb --no-escape --title=\"$TITLE\" --width=300 --progress --no-buttons --auto-close --undecorated "
+    else
+        PROGRESS_OPTION=""
+    fi
+    echo Progress Option is $PROGRESS_OPTION 
+
     while [ "$status" = "0" ]; do
         display_selections
         actions
@@ -368,9 +377,11 @@ local lum_pid yad_pid tail_pid ENCRYPT_OPTION
         tail -n20  -f --pid=$yad_pid $PROG_FILE >&10 &
 	
         if [ -z "$lum_pid" ]; then 
-            $CLI_PROG gui $PRETEND $ENCRYPT_OPTION --msdos --force=flock --from="$source" -t /dev/$usb_device --gui-progress yad --center --window-icon=drive-removable-media-usb --no-escape --title="$TITLE" --width=300 --progress --progress-text="$TITLE" --no-buttons --auto-close --undecorated 2>/dev/null &
+            $CLI_PROG gui $PRETEND $ENCRYPT_OPTION --msdos --force=flock --from="$source" -t /dev/$usb_device $PROGRESS_OPTION 2>/dev/null &
             lum_pid=$!
-            #fake_progress
+            if [ "$PROGRESS_OPTION" = "" ]; then
+            fake_progress
+            fi
 	    echo "LUM PID IS " $lum_pid
         fi
 
@@ -385,7 +396,7 @@ local lum_pid yad_pid tail_pid ENCRYPT_OPTION
 
         sleep .1
 
-#        test -d /proc/$yad_pid || echo "yad exited"
+        test -d /proc/$yad_pid || echo "yad exited"
         test -d /proc/$lum_pid || echo "lum exited"
 
         if test -d /proc/$lum_pid; then
@@ -395,7 +406,13 @@ local lum_pid yad_pid tail_pid ENCRYPT_OPTION
            kill -CONT $lum_pid
            case $ret in
 
-                0) echo continueing ;;
+                0) if [ "$PROGRESS_OPTION" = "" ]; then
+                   fake_progress
+                   else
+                   echo continueing
+                   fi
+                   ;;
+
                 1) USER_STOP=true && break ;;
 
            esac
@@ -452,11 +469,12 @@ source=$(readlink -f "$source")
 make_encrypt=$(echo $selections|cut -d "|" -f4)
 }
 
-#fake_progress()
-#{
-#yad --progress &
-#yad_prog_pid=$!
-#}
+fake_progress()
+{
+tail -n20  -f --pid=$yad_pid $PROG_FILE  |yad --window-icon=drive-removable-media-usb --center --undecorated --no-escape --title="$TITLE" --skip-taskbar --width=300 --progress --progress-text="$TITLE" --pulsate --on-top --no-buttons &
+yad_prog_pid=$!
+}
+
 
 add_encrypt_checkbox()
 {
@@ -476,8 +494,6 @@ case $MODE in
 esac
 }
 #launch gui
-
-#export fake_progress
 
 main "$@"
 
