@@ -1,5 +1,5 @@
 #!/bin/bash
-
+    
 ##Original Code by dolphin_oracle and BitJam November 15 2016 (dolphinoracle@gmail.com)
 ##License is GPL 3.0
 ##originally developed for antiX and mx linux.
@@ -50,6 +50,7 @@ MSG_OTHER_LOCK_ERROR=$"Failed to obtain lock on %s"
 PROGRESS_CLOSED=$"Progress window closed, but job not done. Do you want to keep going?"
 YES=$"Yes"
 NO=$"No"
+ENCRYPT=$"Encrypt Live-USB"
 
 PRETEND=$1
 echo "Pretend Mode = " $PRETEND
@@ -64,6 +65,13 @@ else
     BROWSER="xdg-open"
 fi
 
+##If automount-antiX is present, disable automounting on pressing of apply button.
+if [ -e "/usr/local/bin/automount-antix" ]; then
+    if [ $(ps -aux |grep -v grep |grep -q devmon && echo $? ) = 0 ]; then
+    automount_disable_flag=TRUE
+    echo automount_disable_flag is $automount_disable_flag
+    fi
+fi
 
 ##-----------------------------------------------------
 
@@ -77,15 +85,36 @@ main() {
     exec 10<> $FIFO
     truncate -s0 $PROG_FILE
 
+
+    ##MODE 1 is clone, no encyrption available
+    ##MODE 2 is standard with no encryption available
+    ##MODE 3 is clone with encryption available
+    ##MODE 4 is standard iso selection with encryption available
+    ##We start with mode 2, standard no encyrption, for backward compatibility
     MODE=2
     status=0
     ##start gui and run actions
     ##user that launched the app
-    launch_user=$(ps -aux |grep -m 1 su-to-root |awk '{print $1}')
+    launch_user=$(ps -aux |grep -v grep| grep -m 1 live-usb-maker-gui |awk '{print $1}')
     echo "launch user is " $launch_user
 
     #offer clone mode if running live
     check_clone_mode
+    
+    ##check that encrypt option is available
+    live-usb-maker --help | grep -q -- --encrypt 
+    if [ $? = 0 ]; then 
+        add_encrypt_checkbox
+    fi
+
+    ##check that gui progress option is available
+    live-usb-maker --help | grep -q -- --gui-progress
+    if [ $? = 0 ]; then
+        PROGRESS_OPTION="--gui-progress yad --center --window-icon=drive-removable-media-usb --no-escape --title=\"$TITLE\" --width=300 --on-top --progress --no-buttons --auto-close --undecorated "
+    else
+        PROGRESS_OPTION=""
+    fi
+    echo Progress Option is $PROGRESS_OPTION 
 
     while [ "$status" = "0" ]; do
         display_selections
@@ -93,7 +122,6 @@ main() {
         status=$actionstatus
     
     done
-    clean_up
 }
 
 #define functions
@@ -129,16 +157,30 @@ display_selections() {
 
     case $MODE in
 
-        1) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        1) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>Clone Mode</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_CLONE":CB "clone"\
             --field="":LBL "") ;;
 
-        2) selections=$(yad --window-icon=drive-removable-media-usb --form --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        2) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" \
+            --field="":LBL "") ;;
+            
+        3) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+            --field="<b>Clone Mode</b>":LBL ""\
+            --field="$CHOOSE_USB":CB "$usb_list"\
+            --field="$CHOOSE_CLONE":CB "clone"\
+            --field="$ENCRYPT":CHK ""\
+            --field="":LBL "") ;;
+
+        4) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+            --field="<b>$TITLE</b>":LBL ""\
+            --field="$CHOOSE_USB":CB "$usb_list"\
+            --field="$CHOOSE_ISO":FL "$source" \
+            --field="$ENCRYPT":CHK ""\
             --field="":LBL "") ;;
     esac
 }
@@ -166,10 +208,11 @@ adjust_settings() {
 
     echo "usb_device is " $usb_device
     echo "source is " $source
+    echo "make encrypt is " $make_encrypt
 
     #check to make sure source is a iso
 
-    if [ $MODE = 2 ]; then
+    if [[ $MODE = 2 || $MODE = 4 ]]; then
         if [ "$(file "$source" |grep -i -q iso && echo $?)" = "0" ]; then
             echo "is a iso file"
             is_a_iso=true
@@ -183,11 +226,23 @@ adjust_settings() {
     case $MODE in
 
         1) source="clone"
-	   make_live_usb
+           make_live_usb
+           error_notification
+            ;;
+            
+        3) source="clone"
+           make_live_usb
            error_notification
             ;;
             
         2)  if [ $is_a_iso = true ]; then
+                make_live_usb
+                error_notification
+            else
+                actionstatus=0
+            fi ;;
+            
+        4)  if [ $is_a_iso = true ]; then
                 make_live_usb
                 error_notification
             else
@@ -284,13 +339,14 @@ clean_up()
     test -e $FIFO     && rm -f $FIFO
     test -d $WORK_DIR && rmdir $WORK_DIR
     unflock $LOCK_FILE
+    relaunch_automount-antix
 }
 
 error_notification()
 {
 
 if [ $USER_STOP = true ]; then
-    yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$STOP_MESSAGE</b>":LBL ""
+    yad --window-icon=drive-removable-media-usb --center --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$STOP_MESSAGE</b>":LBL ""
     actionstatus=1
 fi
 
@@ -298,11 +354,11 @@ if [ $USER_STOP = false ]; then
     if test -f $ERR_FILE; then 
         echo "cli code had a fatal error"
         MESSAGE="$(cat $ERR_FILE)"
-        yad --window-icon=drive-removable-media-usb --width=300 --form --title="$TITLE" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
+        yad --window-icon=drive-removable-media-usb --center --width=300 --form --title="$TITLE" --button=gtk-ok --text="$MESSAGE" --buttons-layout=center
         actionstatus=0
     else
         echo "cli code ran without error"
-        yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$COMPLETE</b>":LBL ""
+        yad --window-icon=drive-removable-media-usb --center --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$COMPLETE</b>":LBL ""
         actionstatus=1
     fi
 fi
@@ -310,19 +366,35 @@ fi
 
 make_live_usb()
 {
-local lum_pid yad_pid tail_pid
+local lum_pid yad_pid tail_pid ENCRYPT_OPTION
+
+    if [ "$automount_disable_flag" = "TRUE" ]; then
+        #kill any previous devmon running
+        pkill devmon
+        automount_renable_flag="TRUE"
+    fi
+
+    if [ "$make_encrypt" = "TRUE" ]; then
+        ENCRYPT_OPTION="--encrypt"
+        else
+        ENCRYPT_OPTION=""
+    fi
+    
+    echo "Encrypt enabled in lum is " $ENCRYPT_OPTION
 
     while true; do
 
-        yad --window-icon=drive-removable-media-usb --title="$TITLE" --text-info --button=$CLOSE!gtk-close!:1 --width=880 --height=350 --tail --center <&10 &
+        yad --window-icon=drive-removable-media-usb --center --title="$TITLE" --text-info --button=$CLOSE!gtk-close!:1 --width=880 --height=350 --tail --center <&10 &
         yad_pid=$!
 
         tail -n20  -f --pid=$yad_pid $PROG_FILE >&10 &
 	
         if [ -z "$lum_pid" ]; then 
-            $CLI_PROG gui $PRETEND --force=flock --from="$source" -t /dev/$usb_device 2>/dev/null &
+            $CLI_PROG gui $PRETEND $ENCRYPT_OPTION --msdos --force=flock --from="$source" -t /dev/$usb_device $PROGRESS_OPTION 2>/dev/null &
             lum_pid=$!
+            if [ "$PROGRESS_OPTION" = "" ]; then
             fake_progress
+            fi
 	    echo "LUM PID IS " $lum_pid
         fi
 
@@ -342,12 +414,18 @@ local lum_pid yad_pid tail_pid
 
         if test -d /proc/$lum_pid; then
            kill_pids $yad_prog_pid
-           yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button="$NO"!gtk-close!:1 --button="$YES"!gtk-ok!:0 --buttons-layout=center --field="$PROGRESS_CLOSED":LBL ""
+           yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --center --title="$TITLE" --button="$NO"!gtk-close!:1 --button="$YES"!gtk-ok!:0 --buttons-layout=center --field="$PROGRESS_CLOSED":LBL ""
        	   local ret=$?
            kill -CONT $lum_pid
            case $ret in
 
-                0) fake_progress ;;
+                0) if [ "$PROGRESS_OPTION" = "" ]; then
+                   fake_progress
+                   else
+                   echo continueing
+                   fi
+                   ;;
+
                 1) USER_STOP=true && break ;;
 
            esac
@@ -391,21 +469,55 @@ yad_error()
 {
 
 local error_message=$1
-yad --window-icon=drive-removable-media-usb --width=300 --align=center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$error_message</b>":LBL ""
+yad --window-icon=drive-removable-media-usb --width=300 --align=center --center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$error_message</b>":LBL ""
     exit 0
 }
 
 device_and_source()
 {
+echo $selections
 usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
 source=$(echo $selections|cut -d "|" -f3)
 source=$(readlink -f "$source")
+make_encrypt=$(echo $selections|cut -d "|" -f4)
 }
 
 fake_progress()
 {
-yad --window-icon=drive-removable-media-usb --undecorated --no-escape --title="$TITLE" --skip-taskbar --width=300 --progress --pulsate --on-top --no-buttons &
+tail -n20  -f --pid=$yad_pid $PROG_FILE  |yad --window-icon=drive-removable-media-usb --on-top --center --undecorated --no-escape --title="$TITLE" --width=300 --progress --progress-text="$TITLE" --pulsate --no-buttons &
 yad_prog_pid=$!
+}
+
+
+add_encrypt_checkbox()
+{
+echo encypt test
+echo MODE = $MODE
+
+##MODE 1 is clone, no encyrption available
+##MODE 2 is standard with no encryption available
+##MODE 3 is clone with encryption available
+##MODE 4 is standard iso selection with encryption available
+
+case $MODE in
+
+    1) MODE=3;;
+    2) MODE=4;;
+
+esac
+}
+
+relaunch_automount-antix()
+{
+if [ "$automount_renable_flag" = "TRUE" ]; then
+    #relaunch automount-antix
+    if [ "$launch_user" != "root" ]; then
+    echo su $launch_user -c automount-antix
+    su $launch_user -c automount-antix
+    else
+    yad_error $"automount-antix and\/or devmon was disabled.  You will need manually restart automount-antix or devmon as a regular user"
+    fi
+fi
 }
 #launch gui
 
