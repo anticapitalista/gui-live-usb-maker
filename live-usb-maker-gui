@@ -1,5 +1,5 @@
 #!/bin/bash
-
+    
 ##Original Code by dolphin_oracle and BitJam November 15 2016 (dolphinoracle@gmail.com)
 ##License is GPL 3.0
 ##originally developed for antiX and mx linux.
@@ -65,6 +65,13 @@ else
     BROWSER="xdg-open"
 fi
 
+##If automount-antiX is present, disable automounting on pressing of apply button.
+if [ -e "/usr/local/bin/automount-antix" ]; then
+    if [ $(ps -aux |grep -v grep |grep -q devmon && echo $? ) = 0 ]; then
+    automount_disable_flag=TRUE
+    echo automount_disable_flag is $automount_disable_flag
+    fi
+fi
 
 ##-----------------------------------------------------
 
@@ -88,7 +95,7 @@ main() {
     status=0
     ##start gui and run actions
     ##user that launched the app
-    launch_user=$(ps -aux |grep -m 1 su-to-root |awk '{print $1}')
+    launch_user=$(ps -aux |grep -v grep| grep -m 1 live-usb-maker-gui |awk '{print $1}')
     echo "launch user is " $launch_user
 
     #offer clone mode if running live
@@ -103,7 +110,7 @@ main() {
     ##check that gui progress option is available
     live-usb-maker --help | grep -q -- --gui-progress
     if [ $? = 0 ]; then
-        PROGRESS_OPTION="--gui-progress yad --center --window-icon=drive-removable-media-usb --no-escape --title=\"$TITLE\" --width=300 --progress --no-buttons --auto-close --undecorated "
+        PROGRESS_OPTION="--gui-progress yad --center --window-icon=drive-removable-media-usb --no-escape --title=\"$TITLE\" --width=300 --on-top --progress --no-buttons --auto-close --undecorated "
     else
         PROGRESS_OPTION=""
     fi
@@ -115,7 +122,6 @@ main() {
         status=$actionstatus
     
     done
-    clean_up
 }
 
 #define functions
@@ -333,6 +339,7 @@ clean_up()
     test -e $FIFO     && rm -f $FIFO
     test -d $WORK_DIR && rmdir $WORK_DIR
     unflock $LOCK_FILE
+    relaunch_automount-antix
 }
 
 error_notification()
@@ -360,6 +367,12 @@ fi
 make_live_usb()
 {
 local lum_pid yad_pid tail_pid ENCRYPT_OPTION
+
+    if [ "$automount_disable_flag" = "TRUE" ]; then
+        #kill any previous devmon running
+        pkill devmon
+        automount_renable_flag="TRUE"
+    fi
 
     if [ "$make_encrypt" = "TRUE" ]; then
         ENCRYPT_OPTION="--encrypt"
@@ -471,7 +484,7 @@ make_encrypt=$(echo $selections|cut -d "|" -f4)
 
 fake_progress()
 {
-tail -n20  -f --pid=$yad_pid $PROG_FILE  |yad --window-icon=drive-removable-media-usb --center --undecorated --no-escape --title="$TITLE" --skip-taskbar --width=300 --progress --progress-text="$TITLE" --pulsate --on-top --no-buttons &
+tail -n20  -f --pid=$yad_pid $PROG_FILE  |yad --window-icon=drive-removable-media-usb --on-top --center --undecorated --no-escape --title="$TITLE" --width=300 --progress --progress-text="$TITLE" --pulsate --no-buttons &
 yad_prog_pid=$!
 }
 
@@ -492,6 +505,19 @@ case $MODE in
     2) MODE=4;;
 
 esac
+}
+
+relaunch_automount-antix()
+{
+if [ "$automount_renable_flag" = "TRUE" ]; then
+    #relaunch automount-antix
+    if [ "$launch_user" != "root" ]; then
+    echo su $launch_user -c automount-antix
+    su $launch_user -c automount-antix
+    else
+    yad_error $"automount-antix and\/or devmon was disabled.  You will need manually restart automount-antix or devmon as a regular user"
+    fi
+fi
 }
 #launch gui
 
