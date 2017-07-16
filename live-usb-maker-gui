@@ -292,8 +292,7 @@ quit() {
 build_usb_list() {
     #Check if running live
     local line VENDOR NAME SIZE MODEL
-    Live_device=$(get_live_dev)
-    Live_device=$(printf '%s\n' "${Live_device//[[:digit:]]/}")
+    Live_device=$(get_drive $(get_live_dev))
     echo  "Live Device is " $Live_device
     unset usb_list
     #build list for usb_device selection box
