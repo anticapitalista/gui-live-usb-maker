@@ -65,13 +65,6 @@ else
     BROWSER="xdg-open"
 fi
 
-##If automount-antiX is present, disable automounting on pressing of apply button.
-if [ -e "/usr/local/bin/automount-antix" ]; then
-    if [ $(ps -aux |grep -v grep |grep -q devmon && echo $? ) = 0 ]; then
-    automount_disable_flag=TRUE
-    echo automount_disable_flag is $automount_disable_flag
-    fi
-fi
 
 ##-----------------------------------------------------
 
@@ -292,8 +285,7 @@ quit() {
 build_usb_list() {
     #Check if running live
     local line VENDOR NAME SIZE MODEL
-    Live_device=$(get_live_dev)
-    Live_device=$(printf '%s\n' "${Live_device//[[:digit:]]/}")
+    Live_device=$(get_drive $(get_live_dev))
     echo  "Live Device is " $Live_device
     unset usb_list
     #build list for usb_device selection box
@@ -339,7 +331,7 @@ clean_up()
     test -e $FIFO     && rm -f $FIFO
     test -d $WORK_DIR && rmdir $WORK_DIR
     unflock $LOCK_FILE
-    relaunch_automount-antix
+
 }
 
 error_notification()
@@ -367,12 +359,6 @@ fi
 make_live_usb()
 {
 local lum_pid yad_pid tail_pid ENCRYPT_OPTION
-
-    if [ "$automount_disable_flag" = "TRUE" ]; then
-        #kill any previous devmon running
-        pkill devmon
-        automount_renable_flag="TRUE"
-    fi
 
     if [ "$make_encrypt" = "TRUE" ]; then
         ENCRYPT_OPTION="--encrypt"
@@ -507,18 +493,6 @@ case $MODE in
 esac
 }
 
-relaunch_automount-antix()
-{
-if [ "$automount_renable_flag" = "TRUE" ]; then
-    #relaunch automount-antix
-    if [ "$launch_user" != "root" ]; then
-    echo su $launch_user -c automount-antix
-    su $launch_user -c automount-antix
-    else
-    yad_error $"automount-antix and\/or devmon was disabled.  You will need manually restart automount-antix or devmon as a regular user"
-    fi
-fi
-}
 #launch gui
 
 main "$@"
