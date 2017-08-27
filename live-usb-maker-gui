@@ -105,8 +105,12 @@ main() {
     launch_user=$(ps -aux |grep -v grep| grep -m 1 live-usb-maker-gui |awk '{print $1}')
     echo "launch user is " $launch_user
 
-    #offer clone mode if running live
-    check_clone_mode
+    #offer clone mode if running live and dd_switch is blank
+    if [ "$dd_default" = "--dd" ]; then
+        echo "dd mode selected, don't check clone mode"
+    else
+        check_clone_mode
+    fi
     
     ##check that encrypt option is available
     live-usb-maker --help | grep -q -- --encrypt 
