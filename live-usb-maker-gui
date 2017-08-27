@@ -542,7 +542,7 @@ make_dd_usb()
     echo "target_io is : " $target_io    
 
     #dd bs=1M if=$source of=$target && sync
-    #dd bs=1M if="$source" of=/dev/$usb_device &
+    dd bs=1M if="$source" of=/dev/$usb_device &
     dd_pid=$!
     dd_progress
     trip=0
