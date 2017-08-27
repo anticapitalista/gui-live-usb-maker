@@ -51,6 +51,10 @@ PROGRESS_CLOSED=$"Progress window closed, but job not done. Do you want to keep 
 YES=$"Yes"
 NO=$"No"
 ENCRYPT=$"Encrypt Live-USB"
+dd_mode=$"dd mode"
+copy_mode=$"Update mode"
+full_featured=$"Normal mode - full featured live USB"
+dd_title="making liveUSB in dd mode"
 
 PRETEND=$1
 echo "Pretend Mode = " $PRETEND
@@ -160,20 +164,21 @@ display_selections() {
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" \
+            --field=$"Options":CB "1: $full_featured!2: $dd_mode!"\
             --field="":LBL "") ;;
             
         3) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>Clone Mode</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_CLONE":CB "clone"\
-            --field="$ENCRYPT":CHK ""\
+            --field=$"Options":CB "1: $full_featured!4: $ENCRYPT"\
             --field="":LBL "") ;;
 
         4) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" \
-            --field="$ENCRYPT":CHK ""\
+            --field=$"Options":CB "1: $full_featured!2: $dd_mode!3: $copy_mode!4: $ENCRYPT"\
             --field="":LBL "") ;;
     esac
 }
@@ -201,8 +206,10 @@ adjust_settings() {
 
     echo "usb_device is " $usb_device
     echo "source is " $source
-    echo "make encrypt is " $make_encrypt
-
+    echo "OPTIONS is " $OPTION
+    
+    check_unmountable
+    
     #check to make sure source is a iso
 
     if [[ $MODE = 2 || $MODE = 4 ]]; then
@@ -216,32 +223,44 @@ adjust_settings() {
         fi
     fi
 
-    case $MODE in
-
-        1) source="clone"
-           make_live_usb
-           error_notification
-            ;;
-            
-        3) source="clone"
-           make_live_usb
-           error_notification
-            ;;
-            
-        2)  if [ $is_a_iso = true ]; then
-                make_live_usb
-                error_notification
-            else
-                actionstatus=0
-            fi ;;
-            
-        4)  if [ $is_a_iso = true ]; then
-                make_live_usb
-                error_notification
-            else
-                actionstatus=0
-            fi ;;
-    esac
+    if [ "$OPTION" = "dd" ]; then
+        if [ $is_a_iso = true ]; then
+        check_size
+        make_dd_usb
+        error_notification
+        else
+        actionstatus=0
+        fi
+    else
+        case $MODE in
+    
+            1) source="clone"
+               make_live_usb
+               error_notification
+                ;;
+                
+            3) source="clone"
+               make_live_usb
+               error_notification
+                ;;
+                
+            2)  if [ $is_a_iso = true ]; then
+                    check_size
+                    make_live_usb
+                    error_notification
+                else
+                    actionstatus=0
+                fi ;;
+                
+            4)  if [ $is_a_iso = true ]; then
+                    check_size
+                    make_live_usb
+                    error_notification
+                else
+                    actionstatus=0
+                fi ;;
+        esac 
+    fi
 }
 
 
@@ -358,15 +377,7 @@ fi
 
 make_live_usb()
 {
-local lum_pid yad_pid tail_pid ENCRYPT_OPTION
-
-    if [ "$make_encrypt" = "TRUE" ]; then
-        ENCRYPT_OPTION="--encrypt"
-        else
-        ENCRYPT_OPTION=""
-    fi
-    
-    echo "Encrypt enabled in lum is " $ENCRYPT_OPTION
+local lum_pid yad_pid tail_pid 
 
     while true; do
 
@@ -376,7 +387,7 @@ local lum_pid yad_pid tail_pid ENCRYPT_OPTION
         tail -n20  -f --pid=$yad_pid $PROG_FILE >&10 &
 	
         if [ -z "$lum_pid" ]; then 
-            $CLI_PROG gui $PRETEND $ENCRYPT_OPTION --msdos --force=flock --from="$source" -t /dev/$usb_device $PROGRESS_OPTION 2>/dev/null &
+            $CLI_PROG gui $PRETEND $OPTION --msdos --force=flock --from="$source" -t /dev/$usb_device $PROGRESS_OPTION 2>/dev/null &
             lum_pid=$!
             if [ "$PROGRESS_OPTION" = "" ]; then
             fake_progress
@@ -454,7 +465,7 @@ yad_error "$msg"
 yad_error()
 {
 
-local error_message=$1
+local error_message="$1"
 yad --window-icon=drive-removable-media-usb --width=300 --align=center --center --form --title="$TITLE" --button=gtk-ok --buttons-layout=center --field="<b>$error_message</b>":LBL ""
     exit 0
 }
@@ -465,7 +476,17 @@ echo $selections
 usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
 source=$(echo $selections|cut -d "|" -f3)
 source=$(readlink -f "$source")
-make_encrypt=$(echo $selections|cut -d "|" -f4)
+OPTION=$(echo $selections|cut -d "|" -f4 |cut -d ":" -f1)
+
+# figure options
+case $OPTION in
+
+        1) OPTION="" ;;
+        2) OPTION="dd"            ;;
+        3) OPTION="--update"   ;;
+        4) OPTION="--encrypt"    ;;
+esac
+
 }
 
 fake_progress()
@@ -474,6 +495,11 @@ tail -n20  -f --pid=$yad_pid $PROG_FILE  |yad --window-icon=drive-removable-medi
 yad_prog_pid=$!
 }
 
+dd_progress()
+{
+tail -n1 -f --pid=$dd_pid $PROG_FILE |yad --window-icon=drive-removable-media-usb --on-top --center --undecorated --no-escape --title="$TITLE" --width=300 --progress --percentage=0 --progress-text="$dd_title" --button=gtk-cancel --auto-kill &
+yad_prog_pid=$!
+}
 
 add_encrypt_checkbox()
 {
@@ -492,6 +518,95 @@ case $MODE in
 
 esac
 }
+
+dd_or_liveUSB()
+{
+if [ "$OPTION" != "dd" ]; then
+    make_dd_usb
+else
+    make_live_usb
+fi
+}
+
+make_dd_usb()
+{
+    local trip dd_pid check_yad check_dd start_io target_io iso_io current_io percent_complete
+    iso_io=$(du_size $source)
+    echo "iso_io is: " $iso_io
+    #convert to sectors
+    iso_io=$(($iso_io * 1024 / 512 * 1024 ))
+    echo "adjusted iso_io size is: " $iso_io
+    start_io=$(cat /sys/block/"$usb_device"/stat |awk '{print $7}')
+    echo "start+io is: " $start_io
+    target_io=$(($start_io + iso_io))
+    echo "target_io is : " $target_io    
+
+    #dd bs=1M if=$source of=$target && sync
+    #dd bs=1M if="$source" of=/dev/$usb_device &
+    dd_pid=$!
+    dd_progress
+    trip=0
+    while [ $trip = 0 ]; do
+        ps --pid $dd_pid 2>/dev/null
+        check_dd=$?
+        ps --pid $yad_prog_pid 2>/dev/null
+        check_yad=$?
+        if [ $check_dd = 0 ]; then
+            if [ $check_yad != 0 ]; then
+            USER_STOP=true
+            trip=1
+            else
+            trip=0
+            current_io=$(cat /sys/block/"$usb_device"/stat |awk '{print $7}')
+            echo "current_io is : " $current_io
+            percent_complete=$(awk "BEGIN {print ($current_io - $start_io)/$iso_io * 100}")
+            echo "percent complete is " $percent_complete
+            echo $percent_complete > $PROG_FILE
+            sleep 2
+            fi
+         else
+            trip=1
+         fi
+    done        
+    kill_pids $dd_pid $yad_prog_pid 
+    sync
+      
+      
+}
+
+check_size()
+{
+local total_size iso_size less_esp
+total_size=$(parted --script /dev/$usb_device unit MiB print 2>/dev/null | sed -rn "s/^Disk.*: ([0-9]+)MiB$/\1/p")
+iso_size=$(du_size $source)
+
+echo "total size is " $total_size
+echo "iso size is " $iso_size
+
+less_esp=$(($total_size - 50))
+
+echo "less_esp is " $less_esp
+
+if [ ${#less_esp} -gt ${#iso_size} ]; then
+    echo "size check ok"
+else
+    msg=$(printf $"USB device is too small for this operation")
+    yad_error "$msg"
+fi
+}
+
+check_unmountable()
+{
+local ret
+umount_all $usb_device
+ret=#?
+if [ $ret = 1 ]; then
+    msg=$(printf "$msg" $usb_device)
+    yad_error "$msg"
+fi
+}
+
+
 
 #launch gui
 
