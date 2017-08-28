@@ -60,7 +60,17 @@ PRETEND=$1
 echo "Pretend Mode = " $PRETEND
 if [ "$PRETEND" = "-p" ]; then
     echo "Pretend Mode Enabled"
+else
+    unset PRETEND
 fi 
+
+dd_default=$1
+if [ "$dd_default" = "--dd" ]; then
+    dd_switch="^"
+    echo "dd default enabled " $dd_switch
+else
+    unset dd_default
+fi
 
 ##If on mx-viewer is present, use mx-viewer, else wise use generic xdg-open 
 if [ -e "/usr/bin/mx-viewer" ]; then
@@ -95,8 +105,12 @@ main() {
     launch_user=$(ps -aux |grep -v grep| grep -m 1 live-usb-maker-gui |awk '{print $1}')
     echo "launch user is " $launch_user
 
-    #offer clone mode if running live
-    check_clone_mode
+    #offer clone mode if running live and dd_switch is blank
+    if [ "$dd_default" = "--dd" ]; then
+        echo "dd mode selected, don't check clone mode"
+    else
+        check_clone_mode
+    fi
     
     ##check that encrypt option is available
     live-usb-maker --help | grep -q -- --encrypt 
@@ -164,7 +178,7 @@ display_selections() {
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" \
-            --field=$"Options":CB "1: $full_featured!2: $dd_mode!"\
+            --field=$"Options":CB "1: $full_featured!$dd_switch 2: $dd_mode!"\
             --field="":LBL "") ;;
             
         3) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
@@ -178,7 +192,7 @@ display_selections() {
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" \
-            --field=$"Options":CB "1: $full_featured!2: $dd_mode!3: $copy_mode!4: $ENCRYPT"\
+            --field=$"Options":CB "1: $full_featured!$dd_switch 2: $dd_mode!3: $copy_mode!4: $ENCRYPT"\
             --field="":LBL "") ;;
     esac
 }
