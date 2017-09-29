@@ -29,4 +29,4 @@ Icon=drive-removable-media-usb
 Type=Application
 Terminal=false
 Exec=su-to-root -X -c "live-usb-maker-gui --dd"
-Categories=System;MX-Live;
+Categories=System;

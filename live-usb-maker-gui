@@ -601,7 +601,7 @@ less_esp=$(($total_size - 50))
 
 echo "less_esp is " $less_esp
 
-if [ ${#less_esp} -gt ${#iso_size} ]; then
+if [ "$less_esp" -gt "$iso_size" ]; then
     echo "size check ok"
 else
     msg=$(printf $"USB device is too small for this operation")
