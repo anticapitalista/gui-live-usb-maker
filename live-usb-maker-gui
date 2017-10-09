@@ -177,7 +177,7 @@ display_selections() {
         2) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
-            --field="$CHOOSE_ISO":FL "$source" \
+            --field="$CHOOSE_ISO":FL "$source" --file-filter="iso|*.iso" \
             --field=$"Options":CB "1: $full_featured!$dd_switch 2: $dd_mode!"\
             --field="":LBL "") ;;
             
@@ -191,7 +191,7 @@ display_selections() {
         4) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
-            --field="$CHOOSE_ISO":FL "$source" \
+            --field="$CHOOSE_ISO":FL "$source" --file-filter="iso|*.iso" \
             --field=$"Options":CB "1: $full_featured!$dd_switch 2: $dd_mode!3: $copy_mode!4: $ENCRYPT"\
             --field="":LBL "") ;;
     esac
@@ -238,6 +238,7 @@ adjust_settings() {
     fi
 
     if [ "$OPTION" = "dd" ]; then
+	echo "OPTION IS DD"
         if [ $is_a_iso = true ]; then
         check_size
         make_dd_usb
@@ -490,16 +491,19 @@ echo $selections
 usb_device=$(echo $selections|cut -d "|" -f2|cut -d " " -f1)
 source=$(echo $selections|cut -d "|" -f3)
 source=$(readlink -f "$source")
-OPTION=$(echo $selections|cut -d "|" -f4 |cut -d ":" -f1)
+OPTION=$(echo $selections|cut -d "|" -f4 |cut -d ":" -f1| tr -d '[:space:]')
 
 # figure options
+
 case $OPTION in
 
-        1) OPTION="" ;;
-        2) OPTION="dd"            ;;
-        3) OPTION="--update"   ;;
-        4) OPTION="--encrypt"    ;;
+       1) OPTION="";;
+       2) OPTION="dd";;
+        3) OPTION="--update";;
+        4) OPTION="--encrypt";;
 esac
+
+echo "OPTION IN DEVICE_AND_SOURCE IS " $OPTION
 
 }
 
@@ -511,7 +515,7 @@ yad_prog_pid=$!
 
 dd_progress()
 {
-tail -n1 -f --pid=$dd_pid $PROG_FILE |yad --window-icon=drive-removable-media-usb --on-top --center --undecorated --no-escape --title="$TITLE" --width=300 --progress --percentage=0 --progress-text="$dd_title" --button=gtk-cancel --auto-kill &
+tail -n1 -f --pid=$dd_pid $PROG_FILE |yad --window-icon=drive-removable-media-usb --on-top --center --undecorated --no-escape --title="$TITLE" --width=300 --progress --percentage="0" --progress-text="$dd_title" --button=gtk-cancel --auto-kill &
 yad_prog_pid=$!
 }
 
@@ -558,13 +562,17 @@ make_dd_usb()
     #dd bs=1M if=$source of=$target && sync
     dd bs=1M if="$source" of=/dev/$usb_device &
     dd_pid=$!
+    echo "dd pid is " $dd_pid
     dd_progress
+    echo "yad pid is " $yad_prog_pid
     trip=0
     while [ $trip = 0 ]; do
         ps --pid $dd_pid 2>/dev/null
         check_dd=$?
+        echo "check_dd is " $check_dd
         ps --pid $yad_prog_pid 2>/dev/null
         check_yad=$?
+        echo "check_yad is " $check_yad
         if [ $check_dd = 0 ]; then
             if [ $check_yad != 0 ]; then
             USER_STOP=true
