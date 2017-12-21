@@ -560,13 +560,15 @@ make_dd_usb()
     echo "target_io is : " $target_io    
 
     #dd bs=1M if=$source of=$target && sync
-    dd bs=1M if="$source" of=/dev/$usb_device &
+    dd conv=fdatasync bs=1M if="$source" of=/dev/$usb_device &
     dd_pid=$!
     echo "dd pid is " $dd_pid
     dd_progress
     echo "yad pid is " $yad_prog_pid
     trip=0
     while [ $trip = 0 ]; do
+        #echo "dd pid is " $dd_pid
+        #echo "yad pid is " $yad_prog_pid
         ps --pid $dd_pid 2>/dev/null
         check_dd=$?
         echo "check_dd is " $check_dd
@@ -584,7 +586,7 @@ make_dd_usb()
             percent_complete=$(awk "BEGIN {print ($current_io - $start_io)/$iso_io * 100}")
             echo "percent complete is " $percent_complete
             echo $percent_complete > $PROG_FILE
-            sleep 2
+            sleep 1
             fi
          else
             trip=1
