@@ -21,6 +21,7 @@ CLI_PROG="live-usb-maker"
 LOCK_FILE="/run/lock/$CLI_PROG"
 ERR_FILE="/var/log/$CLI_PROG.error"
 PROG_FILE="/var/log/$CLI_PROG.progress"
+LOG_FILE="/var/log/$CLI_PROG.log"
 
 USER_STOP=false
 
@@ -55,6 +56,7 @@ dd_mode=$"dd mode"
 copy_mode=$"Update mode"
 full_featured=$"Normal mode - full featured live USB"
 dd_title="making liveUSB in dd mode"
+
 
 PRETEND=$1
 echo "Pretend Mode = " $PRETEND
@@ -364,6 +366,9 @@ clean_up()
 {
     test -e $FIFO     && rm -f $FIFO
     test -d $WORK_DIR && rmdir $WORK_DIR
+    #reset dirty_bytes if we changed it and we have an unexpected exit
+    [ "$ORIG_DIRTY_BYTES" ] && sysctl vm.dirty_bytes=$ORIG_DIRTY_BYTES >> $LOG_FILE
+    [ "$ORIG_DIRTY_RATIO" ] && sysctl vm.dirty_ratio=$ORIG_DIRTY_RATIO >> $LOG_FILE
     unflock $LOCK_FILE
 
 }
@@ -559,8 +564,13 @@ make_dd_usb()
     target_io=$(($start_io + iso_io))
     echo "target_io is : " $target_io    
 
-    #dd bs=1M if=$source of=$target && sync
-    dd conv=fdatasync bs=1M if="$source" of=/dev/$usb_device &
+    #adjust vm.dirty.bytes for progress meter and speed bump
+    ORIG_DIRTY_RATIO=$(sysctl -n vm.dirty_ratio)
+    ORIG_DIRTY_BYTES=$(sysctl -n vm.dirty_bytes)
+    usb_dirty_bytes=20000000
+    sysctl vm.dirty_bytes=$USB_DIRTY_BYTES >> $LOG_FILE
+    #dd conv=fdatasync bs=1M if="$source" of=/dev/$usb_device &
+    dd bs=1M if="$source" of=/dev/$usb_device &
     dd_pid=$!
     echo "dd pid is " $dd_pid
     dd_progress
@@ -594,7 +604,10 @@ make_dd_usb()
     done        
     kill_pids $dd_pid $yad_prog_pid 
     sync
-      
+    #put vm.dirty.bytes back the way we found theme
+    sysctl vm.dirty_bytes=$ORIG_DIRTY_BYTES >> $LOG_FILE
+    sysctl vm.dirty_ratio=$ORIG_DIRTY_RATIO >> $LOG_FILE
+    unset ORIG_DIRTY_BYTES ORIG_DIRTY_RATIO
       
 }
 
