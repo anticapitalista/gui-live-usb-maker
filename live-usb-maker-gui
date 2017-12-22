@@ -567,8 +567,8 @@ make_dd_usb()
     #adjust vm.dirty.bytes for progress meter and speed bump
     ORIG_DIRTY_RATIO=$(sysctl -n vm.dirty_ratio)
     ORIG_DIRTY_BYTES=$(sysctl -n vm.dirty_bytes)
-    usb_dirty_bytes=20000000
-    sysctl vm.dirty_bytes=$USB_DIRTY_BYTES >> $LOG_FILE
+    usb_dirty_bytes_gui=20000000
+    sysctl vm.dirty_bytes=$usb_dirty_bytes_gui >> $LOG_FILE
     #dd conv=fdatasync bs=1M if="$source" of=/dev/$usb_device &
     dd bs=1M if="$source" of=/dev/$usb_device &
     dd_pid=$!
