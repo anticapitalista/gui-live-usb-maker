@@ -108,7 +108,7 @@ main() {
     echo "launch user is " $launch_user
 
     #offer clone mode if running live and dd_switch is blank
-    if [ "$dd_default" = "--dd" ]; then
+    if [ "$dd_defaLC_ALL=en_US.utf8ult" = "--dd" ]; then
         echo "dd mode selected, don't check clone mode"
     else
         check_clone_mode
@@ -144,8 +144,8 @@ check_clone_mode() {
     echo "live check = " $LIVE_CHECK
     if [ "$LIVE_CHECK" = "overlay" ] || [ "$LIVE_CHECK" = "aufs" ]; then
 
-        MODE_SELECTION=$(yad --window-icon=drive-removable-media-usb --form --num-output --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --title="$TITLE" \
-            --field="<b>$CHOOSE_MODE_TITLE</b>":LBL ""\
+        MODE_SELECTION=$(yad --window-icon=drive-removable-media-usb --form --num-output --button="$APPLY"!emblem-default!:0 --button="$CLOSE"!gtk-close!:1 --title="$TITLE" \
+            --field="<b>"$CHOOSE_MODE_TITLE"</b>":LBL ""\
             --field="":CB "$CLONE_RUNNING_SYSTEM!$CHOOSE_ISO"\
             --field="":LBL "")
 
@@ -170,27 +170,27 @@ display_selections() {
 
     case $MODE in
 
-        1) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        1) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button="$ABOUT"!help-about!:8 --button="$HELP"!help-contents!:4 --button="$APPLY"!emblem-default!:0 --button="$CLOSE"!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>Clone Mode</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_CLONE":CB "clone"\
             --field="":LBL "") ;;
 
-        2) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        2) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button="$ABOUT"!help-about!:8 --button="$HELP"!help-contents!:4 --button="$APPLY"!emblem-default!:0 --button="$CLOSE"!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" --file-filter="iso|*.iso" \
             --field=$"Options":CB "1: $full_featured!$dd_switch 2: $dd_mode!"\
             --field="":LBL "") ;;
             
-        3) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        3) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button="$ABOUT"!help-about!:8 --button="$HELP"!help-contents!:4 --button="$APPLY"!emblem-default!:0 --button="$CLOSE"!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>Clone Mode</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_CLONE":CB "clone"\
             --field=$"Options":CB "1: $full_featured!4: $ENCRYPT"\
             --field="":LBL "") ;;
 
-        4) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button=$ABOUT!help-about!:8 --button=$HELP!help-contents!:4 --button=$APPLY!emblem-default!:0 --button=$CLOSE!gtk-close!:1 --width=300 --title="$TITLE" \
+        4) selections=$(yad --window-icon=drive-removable-media-usb --form --center --button="$ABOUT"!help-about!:8 --button="$HELP"!help-contents!:4 --button="$APPLY"!emblem-default!:0 --button="$CLOSE"!gtk-close!:1 --width=300 --title="$TITLE" \
             --field="<b>$TITLE</b>":LBL ""\
             --field="$CHOOSE_USB":CB "$usb_list"\
             --field="$CHOOSE_ISO":FL "$source" --file-filter="iso|*.iso" \
@@ -283,7 +283,7 @@ adjust_settings() {
 
 display_about() {
     device_and_source
-    info=$(yad --selectable-labels --window-icon=drive-removable-media-usb --align=center --form --button=$LICENSE:5 --button=OK:0 --width=300 --title="About Live-USB Maker GUI"\
+    info=$(yad --selectable-labels --window-icon=drive-removable-media-usb --align=center --form --button="$LICENSE":5 --button=OK:0 --width=300 --title=$"About Live-USB Maker GUI"\
         --field="<b>$TITLE</b>":LBL ""\
         --field=" ":LBL " "\
         --field="$VERSION 16.11":LBL ""\
@@ -336,7 +336,7 @@ build_usb_list() {
             if [ $test = 0 ]; then
                 echo $NAME $VENDOR $MODEL $SIZE
                 if [ "$line" != "" ]; then
-                    usb_list="$NAME   $VENDOR $MODEL $SIZE!"$usb_list
+                    usb_list="$NAME   $VENDOR $MODEL $SIZE!""$usb_list"
                 fi
             fi
         fi
@@ -345,7 +345,7 @@ $(lsblk --nodeps --pairs -no name,size,model,vendor -I 3,8,22,179,259)
 LsBlk
 
     if [ "$usb_device" != "" ]; then
-        usb_list=$usb_device!$usb_list
+        usb_list="$usb_device"!"$usb_list"
     fi
 
     if [ "$usb_list" = "" ]; then
@@ -401,7 +401,7 @@ local lum_pid yad_pid tail_pid
 
     while true; do
 
-        yad --window-icon=drive-removable-media-usb --center --title="$TITLE" --text-info --button=$CLOSE!gtk-close!:1 --width=880 --height=350 --tail --center <&10 &
+        yad --window-icon=drive-removable-media-usb --center --title="$TITLE" --text-info --button="$CLOSE"!gtk-close!:1 --width=880 --height=350 --tail --center <&10 &
         yad_pid=$!
 
         tail -n20  -f --pid=$yad_pid $PROG_FILE >&10 &
