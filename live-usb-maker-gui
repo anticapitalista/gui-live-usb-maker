@@ -145,7 +145,7 @@ check_clone_mode() {
     if [ "$LIVE_CHECK" = "overlay" ] || [ "$LIVE_CHECK" = "aufs" ]; then
 
         MODE_SELECTION=$(yad --window-icon=drive-removable-media-usb --form --num-output --button="$APPLY"!emblem-default!:0 --button="$CLOSE"!gtk-close!:1 --title="$TITLE" \
-            --field="<b>"$CHOOSE_MODE_TITLE"</b>":LBL ""\
+            --field="<b>$CHOOSE_MODE_TITLE</b>":LBL ""\
             --field="":CB "$CLONE_RUNNING_SYSTEM!$CHOOSE_ISO"\
             --field="":LBL "")
 
